@@ -3,7 +3,6 @@ import { UserAccount } from '../types';
 import {
   User,
   Lock,
-  ArrowRight,
   Sparkles,
   AlertCircle,
   Eye,
@@ -11,7 +10,6 @@ import {
   LogIn,
   ShieldAlert,
   Headphones,
-  Key,
   ShieldCheck,
 } from 'lucide-react';
 
@@ -107,15 +105,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
             <div className="border-l border-slate-700 pl-3">
               <div className="text-sm font-bold text-white leading-tight">Elimisha IT Desk</div>
-              <div className="text-[11px] font-medium text-slate-400">Enterprise Service & Access Hub</div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Secure RBAC Authentication
-            </span>
           </div>
         </div>
       </header>
@@ -123,21 +113,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       {/* Main Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-xl bg-white text-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100">
-          {/* Header: Sign In & Directory Policy */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
-                <LogIn className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900 leading-tight">Account Sign In</h1>
-                <p className="text-xs text-slate-500">Enter your organization credentials</p>
-              </div>
+          {/* Header: Sign In */}
+          <div className="flex items-center gap-3 pb-4 border-b border-slate-100 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+              <LogIn className="w-5 h-5" />
             </div>
-
-            <div className="text-xs font-bold text-slate-400 hidden sm:flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-              <Key className="w-3.5 h-3.5 text-slate-500" />
-              <span>Elimisha IAM</span>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 leading-tight">Account Sign In</h1>
+              <p className="text-xs text-slate-500">Enter your organization credentials</p>
             </div>
           </div>
 
@@ -157,7 +140,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold text-slate-700">
-                  Workplace Email
+                  Email
                 </label>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] text-slate-400 font-medium">Quick fill:</span>
@@ -210,7 +193,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Account Password
+                Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -232,7 +215,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs pt-0.5">
+            <div className="flex items-center text-xs pt-0.5">
               <label className="flex items-center gap-2 text-slate-600 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -242,8 +225,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 />
                 <span className="font-medium">Remember my session</span>
               </label>
-
-              <span className="text-slate-400 font-medium text-[11px]">Elimisha IAM v2.4</span>
             </div>
 
             <button
@@ -254,10 +235,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               {isLoading ? (
                 <span>Authenticating...</span>
               ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
+                <span>Sign In</span>
               )}
             </button>
           </form>
@@ -266,7 +244,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-2.5">
             <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
             <span className="text-[11px] leading-tight">
-              <strong className="text-slate-800">Admin Account Policy:</strong> User accounts are created and provisioned exclusively by IT Administrators in the Admin Console.
+              <strong className="text-slate-800">Admin Account Policy:</strong> User accounts are created and provisioned exclusively by IT Administrators.
             </span>
           </div>
 
@@ -332,7 +310,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </div>
                     </div>
                     <span className="text-xs font-bold text-purple-700 group-hover:text-purple-900 shrink-0">
-                      Sign In &rarr;
+                      Sign In
                     </span>
                   </button>
                 ))
@@ -359,7 +337,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </div>
                     </div>
                     <span className="text-xs font-bold text-sky-700 group-hover:text-sky-900 shrink-0">
-                      Sign In &rarr;
+                      Sign In
                     </span>
                   </button>
                 ))
@@ -386,7 +364,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </div>
                     </div>
                     <span className="text-xs font-bold text-blue-700 group-hover:text-blue-900 shrink-0">
-                      Sign In &rarr;
+                      Sign In
                     </span>
                   </button>
                 ))
@@ -397,7 +375,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* Footer info */}
           <div className="pt-4 mt-5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
             <span>Elimisha Watoto Foundation &copy; {new Date().getFullYear()}</span>
-            <span>helpdesk@elimishafoundation.org</span>
+            <span>it@elimishawatoto.org</span>
           </div>
         </div>
       </main>

@@ -28,8 +28,6 @@ import {
   HelpCircle,
   ThumbsUp,
   Lightbulb,
-  ShieldCheck,
-  ArrowRight,
   Globe,
   LogOut,
   Sparkles,
@@ -44,7 +42,7 @@ interface EmployeePortalPageProps {
   onCreateTicket: (newTicket: Ticket) => void;
   onAddComment: (ticketId: string, comment: Omit<TicketComment, 'id' | 'timestamp'>) => void;
   onUpvoteKBArticle?: (id: string) => void;
-  onSwitchToAdmin: () => void;
+  onSwitchToAdmin?: () => void;
   onLogout?: () => void;
 }
 
@@ -57,7 +55,6 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   onCreateTicket,
   onAddComment,
   onUpvoteKBArticle,
-  onSwitchToAdmin,
   onLogout,
 }) => {
   // Active Tab
@@ -87,7 +84,6 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   }, [currentUser]);
 
   const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
-  const [showAdminPermissionAlert, setShowAdminPermissionAlert] = useState(false);
 
   // Selected Ticket for Modal View
   const [selectedTicketForModal, setSelectedTicketForModal] = useState<Ticket | null>(null);
@@ -319,69 +315,19 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               )}
             </div>
 
-            {/* Switch to IT Admin Dashboard */}
-            <button
-              onClick={() => {
-                if (currentUser && currentUser.role === 'Employee') {
-                  setShowAdminPermissionAlert(true);
-                } else {
-                  onSwitchToAdmin();
-                }
-              }}
-              title="Open IT Support & Admin Management Console"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-all cursor-pointer"
-            >
-              <span>IT Staff Console</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-
             {/* Direct Sign Out Button */}
             {onLogout && (
               <button
                 onClick={onLogout}
                 title="Sign out of your account"
-                className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-normal text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer border border-transparent hover:border-red-200"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer border border-slate-200 hover:border-red-200"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Sign Out</span>
+                <span>Sign Out</span>
               </button>
             )}
           </div>
         </div>
-
-        {/* Modal for Admin Permission Prompt */}
-        {showAdminPermissionAlert && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-4">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-1">
-                IT Staff Console Authorization
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                You are currently logged in as <strong>{selectedEmployeeName}</strong> ({currentUser?.role || 'Employee'}). The IT Staff Console is reserved for technicians and IT administrators.
-              </p>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  onClick={() => setShowAdminPermissionAlert(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Stay in Staff Portal
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAdminPermissionAlert(false);
-                    onSwitchToAdmin();
-                  }}
-                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer shadow-xs"
-                >
-                  Proceed to Console &rarr;
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Main Container */}
