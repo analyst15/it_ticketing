@@ -6,6 +6,7 @@ export type TicketCategory =
   | 'Software (App errors, Activation Keys)'
   | 'Network Connectivity'
   | 'Equipment Request'
+  | 'Printer Toner depleted'
   | 'Other'
   | 'Hardware'
   | 'Software'
@@ -133,8 +134,20 @@ export interface UserAccount {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: UserRole;
   department: string;
   status: UserStatus;
   dateAdded: string;
+}
+
+export interface EmployeeNotification {
+  id: string;
+  ticketId?: string;
+  ticketNumber?: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+  type: 'created' | 'status_changed' | 'assigned' | 'comment_added' | 'info';
 }

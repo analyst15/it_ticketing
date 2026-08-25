@@ -8,6 +8,7 @@ import {
   ITAsset,
   UserAccount,
   TicketComment,
+  EmployeeNotification,
 } from '../types';
 import { StatusBadge, PriorityBadge, CategoryBadge } from './Badges';
 import { formatTimeAgo } from '../utils/time';
@@ -31,6 +32,13 @@ import {
   Globe,
   LogOut,
   Sparkles,
+  X,
+  Bell,
+  CheckCheck,
+  MessageSquare,
+  AlertCircle,
+  ChevronRight,
+  Inbox,
 } from 'lucide-react';
 
 interface EmployeePortalPageProps {
@@ -58,7 +66,7 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   onLogout,
 }) => {
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'tickets' | 'devices' | 'portals' | 'kb'>('tickets');
+  const [activeTab, setActiveTab] = useState<'tickets' | 'devices' | 'portals' | 'kb' | 'notifications'>('tickets');
 
   // Employee Identity (derived from currentUser or localStorage)
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>(() => {
@@ -71,6 +79,37 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
     return currentUser?.department || localStorage.getItem('ewf_employee_dept') || 'Engineering';
   });
 
+  // Employee Notifications State
+  const [notifications, setNotifications] = useState<EmployeeNotification[]>(() => {
+    const userKey = currentUser?.id || currentUser?.email || 'default_user';
+    const saved = localStorage.getItem(`ewf_emp_notifications_${userKey}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+    return [
+      {
+        id: 'notif-welcome',
+        title: 'Welcome to Staff Support Portal',
+        message: 'You can submit requests, track progress in real-time, and receive updates directly here.',
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        type: 'info',
+      },
+    ];
+  });
+
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+
+  // Persist notifications to localStorage
+  useEffect(() => {
+    const userKey = currentUser?.id || currentUser?.email || 'default_user';
+    localStorage.setItem(`ewf_emp_notifications_${userKey}`, JSON.stringify(notifications));
+  }, [notifications, currentUser]);
+
   // Sync with currentUser
   useEffect(() => {
     if (currentUser) {
@@ -82,6 +121,111 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
       localStorage.setItem('ewf_employee_dept', currentUser.department);
     }
   }, [currentUser]);
+
+  // Automatically detect updates on employee's tickets to create real-time in-portal notifications
+  useEffect(() => {
+    const myTkts = tickets.filter((t) => {
+      return (
+        t.reporterName.toLowerCase().trim() === selectedEmployeeName.toLowerCase().trim() ||
+        t.reporterEmail.toLowerCase().trim() === selectedEmployeeEmail.toLowerCase().trim()
+      );
+    });
+
+    myTkts.forEach((ticket) => {
+      // 1. Resolution / Closed Notification
+      if (ticket.status === 'Resolved' || ticket.status === 'Closed') {
+        const notifId = `notif-status-${ticket.id}-${ticket.status}`;
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === notifId)) return prev;
+          return [
+            {
+              id: notifId,
+              ticketId: ticket.id,
+              ticketNumber: ticket.ticketNumber,
+              title: `Ticket ${ticket.ticketNumber} marked as ${ticket.status}`,
+              message: `Your support request "${ticket.title}" has been ${ticket.status.toLowerCase()} by the IT team.`,
+              timestamp: ticket.resolvedAt || ticket.updatedAt || new Date().toISOString(),
+              isRead: false,
+              type: 'status_changed',
+            },
+            ...prev,
+          ];
+        });
+      }
+
+      // 2. Assignment / In Progress Notification
+      if (ticket.status === 'In Progress' && ticket.assignedToName) {
+        const notifId = `notif-assigned-${ticket.id}-${ticket.assignedToName}`;
+        setNotifications((prev) => {
+          if (prev.some((n) => n.id === notifId)) return prev;
+          return [
+            {
+              id: notifId,
+              ticketId: ticket.id,
+              ticketNumber: ticket.ticketNumber,
+              title: `Ticket ${ticket.ticketNumber} assigned to ${ticket.assignedToName}`,
+              message: `IT specialist ${ticket.assignedToName} is actively working on your request "${ticket.title}".`,
+              timestamp: ticket.updatedAt || new Date().toISOString(),
+              isRead: false,
+              type: 'assigned',
+            },
+            ...prev,
+          ];
+        });
+      }
+
+      // 3. Comments added by IT Staff / Agent
+      if (ticket.comments && ticket.comments.length > 1) {
+        const staffComments = ticket.comments.filter(
+          (c) =>
+            c.authorEmail.toLowerCase() !== selectedEmployeeEmail.toLowerCase() &&
+            c.authorName.toLowerCase() !== selectedEmployeeName.toLowerCase()
+        );
+        staffComments.forEach((comm) => {
+          const notifId = `notif-comm-${ticket.id}-${comm.id}`;
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === notifId)) return prev;
+            return [
+              {
+                id: notifId,
+                ticketId: ticket.id,
+                ticketNumber: ticket.ticketNumber,
+                title: `New reply on ${ticket.ticketNumber} from ${comm.authorName}`,
+                message: comm.content.slice(0, 140) + (comm.content.length > 140 ? '...' : ''),
+                timestamp: comm.timestamp,
+                isRead: false,
+                type: 'comment_added',
+              },
+              ...prev,
+            ];
+          });
+        });
+      }
+    });
+  }, [tickets, selectedEmployeeName, selectedEmployeeEmail]);
+
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length;
+  }, [notifications]);
+
+  const handleMarkAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  };
+
+  const handleOpenNotification = (notif: EmployeeNotification) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+    );
+    setShowNotificationDropdown(false);
+    if (notif.ticketId) {
+      const match = tickets.find((t) => t.id === notif.ticketId || t.ticketNumber === notif.ticketNumber);
+      if (match) {
+        setSelectedTicketForModal(match);
+      } else {
+        setActiveTab('tickets');
+      }
+    }
+  };
 
   const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
 
@@ -200,21 +344,24 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
     };
 
     onCreateTicket(newTicket);
+
+    // Instant in-portal notification for the employee
+    const newEmpNotif: EmployeeNotification = {
+      id: `notif-create-${newTicket.id}`,
+      ticketId: newTicket.id,
+      ticketNumber: newTicket.ticketNumber,
+      title: `Support Ticket ${newTicket.ticketNumber} Submitted`,
+      message: `Your request "${newTicket.title}" was submitted and dispatched to the IT Support team.`,
+      timestamp: nowIso,
+      isRead: false,
+      type: 'created',
+    };
+    setNotifications((prev) => [newEmpNotif, ...prev]);
+
     setIsSubmitting(false);
     setShowRequestForm(false);
-    setSubmissionSuccess(`Support request ${newTicket.ticketNumber} created successfully! A technician has been notified.`);
+    setSubmissionSuccess(`Support request ${newTicket.ticketNumber} created successfully! An automated email notification has been dispatched to the IT Support team.`);
     setActiveTab('tickets');
-  };
-
-  // Switch Employee Profile
-  const handleSelectUser = (user: UserAccount) => {
-    setSelectedEmployeeName(user.name);
-    setSelectedEmployeeEmail(user.email);
-    setSelectedEmployeeDept(user.department);
-    localStorage.setItem('ewf_employee_name', user.name);
-    localStorage.setItem('ewf_employee_email', user.email);
-    localStorage.setItem('ewf_employee_dept', user.department);
-    setShowProfileSwitcher(false);
   };
 
   return (
@@ -238,8 +385,136 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
             </div>
           </div>
 
-          {/* Right Actions: Staff Profile, Sign Out, Switch to Admin */}
+          {/* Right Actions: Notifications Bell, Staff Profile, Sign Out */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Notification Bell Dropdown for Employee */}
+            <div className="relative">
+              <button
+                id="employee-header-notifications-btn"
+                onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+                className="relative p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl border border-slate-200/90 transition-all cursor-pointer shadow-2xs"
+                title="View ticket updates & notifications"
+                aria-label="Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs animate-pulse">
+                    {unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {showNotificationDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotificationDropdown(false)} />
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                    {/* Header */}
+                    <div className="px-4 py-3 bg-slate-50/90 border-b border-slate-200/80 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-bold text-slate-900">Notifications</span>
+                        {unreadNotificationCount > 0 && (
+                          <span className="text-[10px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                            {unreadNotificationCount} new
+                          </span>
+                        )}
+                      </div>
+                      {unreadNotificationCount > 0 && (
+                        <button
+                          onClick={handleMarkAllNotificationsAsRead}
+                          className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          <span>Mark all read</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Notification Items List */}
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 space-y-1">
+                          <Inbox className="w-6 h-6 mx-auto text-slate-300" />
+                          <p className="text-xs font-medium text-slate-600">No notifications</p>
+                          <p className="text-[11px] text-slate-400">Updates regarding your tickets will appear here.</p>
+                        </div>
+                      ) : (
+                        notifications.slice(0, 8).map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleOpenNotification(notif)}
+                            className={`p-3.5 hover:bg-blue-50/50 cursor-pointer transition-colors flex items-start gap-3 ${
+                              notif.isRead ? 'bg-white' : 'bg-blue-50/30'
+                            }`}
+                          >
+                            <div
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-xs ${
+                                notif.type === 'status_changed'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : notif.type === 'assigned'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : notif.type === 'comment_added'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {notif.type === 'status_changed' ? (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              ) : notif.type === 'assigned' ? (
+                                <User className="w-3.5 h-3.5" />
+                              ) : notif.type === 'comment_added' ? (
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              ) : (
+                                <Bell className="w-3.5 h-3.5" />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <h4 className={`text-xs truncate ${notif.isRead ? 'font-medium text-slate-800' : 'font-bold text-slate-900'}`}>
+                                  {notif.title}
+                                </h4>
+                                <span className="text-[10px] text-slate-400 shrink-0">
+                                  {formatTimeAgo(notif.timestamp)}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 line-clamp-2 mt-0.5 leading-snug">
+                                {notif.message}
+                              </p>
+                              {notif.ticketNumber && notif.ticketNumber !== 'SYSTEM' && (
+                                <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-blue-600">
+                                  <span>View Ticket {notif.ticketNumber}</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                </div>
+                              )}
+                            </div>
+
+                            {!notif.isRead && (
+                              <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-center">
+                      <button
+                        onClick={() => {
+                          setShowNotificationDropdown(false);
+                          setActiveTab('notifications');
+                        }}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                      >
+                        View all notifications in portal →
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Profile Dropdown */}
             <div className="relative">
               <button
@@ -257,56 +532,52 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
                 </div>
               </button>
 
-              {/* Profile Picker Dropdown */}
+              {/* User Profile Card Dropdown */}
               {showProfileSwitcher && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowProfileSwitcher(false)} />
-                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 z-50 animate-in fade-in zoom-in-95">
-                    <div className="px-2 py-1.5 border-b border-slate-100 mb-2">
-                      <div className="text-xs font-bold text-slate-900 truncate">{selectedEmployeeName}</div>
-                      <div className="text-[11px] text-slate-500 truncate">{selectedEmployeeEmail}</div>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                          {currentUser?.role || 'Employee'}
-                        </span>
-                        <span className="text-[10px] text-slate-400">• {selectedEmployeeDept}</span>
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl p-3.5 z-50 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl mb-3 border border-slate-100">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-2xs shrink-0">
+                        {selectedEmployeeName.charAt(0)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-slate-900 truncate">{selectedEmployeeName}</div>
+                        <div className="text-[11px] text-slate-500 truncate">{selectedEmployeeEmail}</div>
                       </div>
                     </div>
 
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                      Switch Staff Account
-                    </div>
-                    <div className="max-h-52 overflow-y-auto space-y-1 my-1 pr-1">
-                      {users.slice(0, 8).map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => handleSelectUser(u)}
-                          className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                            u.name === selectedEmployeeName
-                              ? 'bg-blue-50 text-blue-900 font-semibold'
-                              : 'hover:bg-slate-50 text-slate-700'
-                          }`}
-                        >
-                          <div className="truncate">
-                            <strong className="block truncate">{u.name}</strong>
-                            <span className="text-[11px] text-slate-400 block truncate">{u.department} • {u.email}</span>
-                          </div>
-                          {u.name === selectedEmployeeName && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-                        </button>
-                      ))}
+                    <div className="space-y-2 px-1 py-1 text-xs">
+                      <div className="flex items-center justify-between text-slate-600 py-1 border-b border-slate-100">
+                        <span className="text-slate-400 text-[11px]">Role</span>
+                        <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[11px]">
+                          {currentUser?.role || 'Employee'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600 py-1 border-b border-slate-100">
+                        <span className="text-slate-400 text-[11px]">Department</span>
+                        <span className="font-semibold text-slate-800 text-[11px]">{selectedEmployeeDept}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600 py-1">
+                        <span className="text-slate-400 text-[11px]">Account Status</span>
+                        <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Active
+                        </span>
+                      </div>
                     </div>
 
                     {onLogout && (
-                      <div className="pt-2 border-t border-slate-100 mt-2">
+                      <div className="pt-3 border-t border-slate-100 mt-2">
                         <button
                           onClick={() => {
                             setShowProfileSwitcher(false);
                             onLogout();
                           }}
-                          className="w-full py-2 px-2.5 rounded-xl text-xs font-normal text-red-600 hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          className="w-full py-2 px-2.5 rounded-xl text-xs font-medium text-red-600 hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-red-100"
                         >
                           <LogOut className="w-3.5 h-3.5" />
-                          <span>Sign Out of Portal</span>
+                          <span>Sign Out</span>
                         </button>
                       </div>
                     )}
@@ -397,12 +668,9 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 pb-4 gap-3">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
               <button
-                onClick={() => {
-                  setActiveTab('tickets');
-                  setShowRequestForm(false);
-                }}
+                onClick={() => setActiveTab('tickets')}
                 className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'tickets' && !showRequestForm
+                  activeTab === 'tickets'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
@@ -412,12 +680,9 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               </button>
 
               <button
-                onClick={() => {
-                  setActiveTab('devices');
-                  setShowRequestForm(false);
-                }}
+                onClick={() => setActiveTab('devices')}
                 className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'devices' && !showRequestForm
+                  activeTab === 'devices'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
@@ -427,12 +692,9 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               </button>
 
               <button
-                onClick={() => {
-                  setActiveTab('portals');
-                  setShowRequestForm(false);
-                }}
+                onClick={() => setActiveTab('portals')}
                 className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'portals' && !showRequestForm
+                  activeTab === 'portals'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
@@ -442,12 +704,9 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               </button>
 
               <button
-                onClick={() => {
-                  setActiveTab('kb');
-                  setShowRequestForm(false);
-                }}
+                onClick={() => setActiveTab('kb')}
                 className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'kb' && !showRequestForm
+                  activeTab === 'kb'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
@@ -455,139 +714,41 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
                 <HelpCircle className="w-4 h-4" />
                 <span>Guides ({kbArticles.length})</span>
               </button>
+
+              <button
+                id="emp-tab-notifications"
+                onClick={() => {
+                  setActiveTab('notifications');
+                  handleMarkAllNotificationsAsRead();
+                }}
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeTab === 'notifications'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                }`}
+              >
+                <Bell className="w-4 h-4" />
+                <span>Notifications</span>
+                {unreadNotificationCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                    {unreadNotificationCount}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* "+ Submit New Request" Button */}
-            {!showRequestForm && (
-              <button
-                onClick={() => handleOpenFormWithCategory('Keyboard or mouse not working')}
-                className="w-full sm:w-auto justify-center px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition-all cursor-pointer shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Support Request</span>
-              </button>
-            )}
+            <button
+              onClick={() => handleOpenFormWithCategory('Keyboard or mouse not working')}
+              className="w-full sm:w-auto justify-center px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition-all cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Support Request</span>
+            </button>
           </div>
 
-        {/* 1. Request Support Form (Embedded View) */}
-        {showRequestForm && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6 animate-in fade-in">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Submit IT Support Request</h2>
-                <p className="text-xs text-slate-500">
-                  Fill out the form below. An incident ticket will be generated and assigned to IT support.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowRequestForm(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                Close Form
-              </button>
-            </div>
-
-            {/* Live AI Instant Deflection Hint */}
-            {aiTip && (
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex items-start gap-3 animate-in fade-in">
-                <Lightbulb className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="text-xs leading-relaxed">
-                  <strong className="block font-semibold text-amber-900 mb-0.5">Quick Self-Service Suggestion:</strong>
-                  <span>{aiTip}</span>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitTicket} className="space-y-4 text-xs">
-              {/* Category & Urgency */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Issue Category *</label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value as TicketCategory)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 focus:outline-hidden focus:border-blue-500 focus:bg-white cursor-pointer"
-                  >
-                    <option value="Keyboard or mouse not working">Keyboard or mouse not working</option>
-                    <option value="Laptop not charging or turning on">Laptop not charging or turning on</option>
-                    <option value="Email Password">Email Password</option>
-                    <option value="Microsoft Office( Word, Powerpoint & Excel)">Microsoft Office( Word, Powerpoint & Excel)</option>
-                    <option value="Software (App errors, Activation Keys)">Software (App errors, Activation Keys)</option>
-                    <option value="Network Connectivity">Network Connectivity</option>
-                    <option value="Equipment Request">Equipment Request</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Urgency / Impact *</label>
-                  <select
-                    value={formPriority}
-                    onChange={(e) => setFormPriority(e.target.value as TicketPriority)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 focus:outline-hidden focus:border-blue-500 focus:bg-white cursor-pointer"
-                  >
-                    <option value="Low">Low - General inquiry / minor request</option>
-                    <option value="Medium">Medium - Standard issue (Work can continue)</option>
-                    <option value="High">High - Significant disruption / Blocked from work</option>
-                    <option value="Critical">Critical - Complete outage / Work blocked</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Subject */}
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Incident Summary / Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="e.g. Mouse cursor freezing intermittently or unable to access Outlook"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Detailed Description *</label>
-                <textarea
-                  required
-                  rows={4}
-                  value={formDescription}
-                  onChange={(e) => handleDescriptionChange(e.target.value)}
-                  placeholder="Please describe what happened, any error messages, and what you were trying to do..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white leading-relaxed"
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  Submitting as <strong className="text-slate-800">{selectedEmployeeName}</strong> ({selectedEmployeeEmail})
-                </span>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowRequestForm(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !formTitle.trim() || !formDescription.trim()}
-                    className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSubmitting ? 'Creating Ticket...' : 'Submit Support Ticket'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* 2. My Tickets Tab */}
-        {activeTab === 'tickets' && !showRequestForm && (
+        {/* 1. My Tickets Tab */}
+        {activeTab === 'tickets' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
               <div>
@@ -782,8 +943,8 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
           </div>
         )}
 
-        {/* 4. Staff Workplace Portals & Services Tab */}
-        {activeTab === 'portals' && !showRequestForm && (
+        {/* 3. Staff Workplace Portals & Services Tab */}
+        {activeTab === 'portals' && (
           <WorkplacePortalsHub
             onRequestHelpWithPortal={(portalName, portalUrl) => {
               setFormCategory('Software (App errors, Activation Keys)');
@@ -795,8 +956,8 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
           />
         )}
 
-        {/* 5. Self-Help Knowledge Base Tab */}
-        {activeTab === 'kb' && !showRequestForm && (
+        {/* 4. Self-Help Knowledge Base Tab */}
+        {activeTab === 'kb' && (
           <div className="space-y-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
@@ -872,8 +1033,236 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
             </div>
           </div>
         )}
+
+        {/* 5. Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-blue-600" />
+                  Your Support Notifications & Updates
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Real-time ticket confirmations, agent assignments, and resolution alerts for {selectedEmployeeName}
+                </p>
+              </div>
+
+              {unreadNotificationCount > 0 && (
+                <button
+                  onClick={handleMarkAllNotificationsAsRead}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>Mark all as read</span>
+                </button>
+              )}
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs divide-y divide-slate-100">
+              {notifications.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 space-y-2">
+                  <Inbox className="w-10 h-10 mx-auto text-slate-300" />
+                  <p className="text-sm font-semibold text-slate-700">No notifications yet</p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    When you submit a support ticket or an IT specialist updates your issue, you will receive alerts here.
+                  </p>
+                </div>
+              ) : (
+                notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    onClick={() => handleOpenNotification(notif)}
+                    className={`p-4 sm:p-5 hover:bg-slate-50 cursor-pointer transition-colors flex items-start gap-4 ${
+                      notif.isRead ? 'bg-white' : 'bg-blue-50/40'
+                    }`}
+                  >
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm ${
+                        notif.type === 'status_changed'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : notif.type === 'assigned'
+                          ? 'bg-blue-100 text-blue-700'
+                          : notif.type === 'comment_added'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {notif.type === 'status_changed' ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : notif.type === 'assigned' ? (
+                        <User className="w-4 h-4" />
+                      ) : notif.type === 'comment_added' ? (
+                        <MessageSquare className="w-4 h-4" />
+                      ) : (
+                        <Bell className="w-4 h-4" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className={`text-sm ${notif.isRead ? 'font-medium text-slate-800' : 'font-bold text-slate-900'}`}>
+                            {notif.title}
+                          </h4>
+                          {!notif.isRead && (
+                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          {formatTimeAgo(notif.timestamp)}
+                        </span>
+                      </div>
+
+                      <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                        {notif.message}
+                      </p>
+
+                      {notif.ticketNumber && notif.ticketNumber !== 'SYSTEM' && (
+                        <div className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                          <span>Open Ticket {notif.ticketNumber} Details</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
         </section>
       </main>
+
+      {/* Support Request Popup Modal */}
+      {showRequestForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in">
+          <div
+            className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Submit IT Support Request</h2>
+                  <p className="text-xs text-slate-500">An incident ticket will be created and dispatched to IT support</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRequestForm(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content / Form */}
+            <form onSubmit={handleSubmitTicket} className="p-6 space-y-4 overflow-y-auto overflow-x-hidden flex-1 text-xs">
+              {/* Live AI Instant Deflection Hint */}
+              {aiTip && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex items-start gap-3 animate-in fade-in">
+                  <Lightbulb className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs leading-relaxed">
+                    <strong className="block font-semibold text-amber-900 mb-0.5">Quick Self-Service Suggestion:</strong>
+                    <span>{aiTip}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Category & Urgency */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="min-w-0">
+                  <label className="font-semibold text-slate-700 block mb-1">Issue Category *</label>
+                  <select
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value as TicketCategory)}
+                    className="w-full max-w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 focus:outline-hidden focus:border-blue-500 focus:bg-white cursor-pointer truncate"
+                  >
+                    <option value="Keyboard or mouse not working">Keyboard or mouse not working</option>
+                    <option value="Laptop not charging or turning on">Laptop not charging or turning on</option>
+                    <option value="Email Password">Email Password</option>
+                    <option value="Microsoft Office( Word, Powerpoint & Excel)">Microsoft Office( Word, Powerpoint & Excel)</option>
+                    <option value="Software (App errors, Activation Keys)">Software (App errors, Activation Keys)</option>
+                    <option value="Network Connectivity">Network Connectivity</option>
+                    <option value="Equipment Request">Equipment Request</option>
+                    <option value="Printer Toner depleted">Printer Toner depleted</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div className="min-w-0">
+                  <label className="font-semibold text-slate-700 block mb-1">Urgency / Impact *</label>
+                  <select
+                    value={formPriority}
+                    onChange={(e) => setFormPriority(e.target.value as TicketPriority)}
+                    className="w-full max-w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 focus:outline-hidden focus:border-blue-500 focus:bg-white cursor-pointer truncate"
+                  >
+                    <option value="Low">Low - General inquiry / minor request</option>
+                    <option value="Medium">Medium - Standard issue (Work can continue)</option>
+                    <option value="High">High - Significant disruption / Blocked from work</option>
+                    <option value="Critical">Critical - Complete outage / Work blocked</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Incident Summary / Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="e.g. Mouse cursor freezing intermittently or unable to access Outlook"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Detailed Description *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={formDescription}
+                  onChange={(e) => handleDescriptionChange(e.target.value)}
+                  placeholder="Please describe what happened, any error messages, and what you were trying to do..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:bg-white leading-relaxed"
+                />
+              </div>
+
+              {/* Submitting info banner */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
+                Submitting as <strong className="text-slate-800 font-semibold">{selectedEmployeeName}</strong> ({selectedEmployeeEmail})
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRequestForm(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !formTitle.trim() || !formDescription.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmitting ? 'Creating Ticket...' : 'Submit Support Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Employee Ticket Details Modal */}
       {selectedTicketForModal && (

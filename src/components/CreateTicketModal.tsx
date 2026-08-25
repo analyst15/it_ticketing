@@ -142,7 +142,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">Create New IT Support Request</h2>
-              <p className="text-xs text-slate-500">Incident ticket will be routed directly to the support queue</p>
+              <p className="text-xs text-slate-500">Auto-routes to support queue & dispatches email to it@elimishawatoto.org and IT Staff</p>
             </div>
           </div>
           <button
@@ -211,12 +211,12 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           {/* Categorization & Urgency */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
             {/* Category */}
-            <div>
+            <div className="min-w-0">
               <label className="font-semibold text-slate-700 block mb-1">Category</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value as TicketCategory)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-blue-500 cursor-pointer shadow-2xs"
+                className="w-full max-w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-blue-500 cursor-pointer shadow-2xs truncate"
               >
                 <option value="Keyboard or mouse not working">Keyboard or mouse not working</option>
                 <option value="Laptop not charging or turning on">Laptop not charging or turning on</option>
@@ -225,17 +225,18 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 <option value="Software (App errors, Activation Keys)">Software (App errors, Activation Keys)</option>
                 <option value="Network Connectivity">Network Connectivity</option>
                 <option value="Equipment Request">Equipment Request</option>
+                <option value="Printer Toner depleted">Printer Toner depleted</option>
                 <option value="Other">Other</option>
               </select>
             </div>
 
             {/* Priority */}
-            <div>
+            <div className="min-w-0">
               <label className="font-semibold text-slate-700 block mb-1">Priority / Urgency</label>
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as TicketPriority)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-blue-500 cursor-pointer shadow-2xs"
+                className="w-full max-w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-blue-500 cursor-pointer shadow-2xs truncate"
               >
                 <option value="Low">Low (P4 - Minor question / Routine request)</option>
                 <option value="Medium">Medium (P3 - Individual degraded functionality)</option>

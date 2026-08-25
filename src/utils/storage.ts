@@ -10,7 +10,11 @@ export function loadUsers(): UserAccount[] {
   try {
     const raw = localStorage.getItem(USERS_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed: UserAccount[] = JSON.parse(raw);
+      return parsed.map(u => ({
+        ...u,
+        password: u.password || (u.role === 'Admin' ? 'admin123' : u.role === 'IT Staff' ? 'staff123' : 'employee123'),
+      }));
     }
   } catch (e) {
     console.error('Failed to load users from localStorage:', e);

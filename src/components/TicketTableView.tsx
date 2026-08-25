@@ -45,6 +45,8 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
   onFilterChange,
 }) => {
   const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([]);
+  const [ticketToDelete, setTicketToDelete] = useState<Ticket | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // Filter and Sort Tickets
   const filteredTickets = useMemo(() => {
@@ -178,6 +180,7 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
               <option value="Software (App errors, Activation Keys)">Software (App errors, Activation Keys)</option>
               <option value="Network Connectivity">Network Connectivity</option>
               <option value="Equipment Request">Equipment Request</option>
+              <option value="Printer Toner depleted">Printer Toner depleted</option>
               <option value="Other">Other</option>
             </select>
 

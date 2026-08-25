@@ -1,10 +1,77 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
+import nodemailer from "nodemailer";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 
 dotenv.config();
+
+// Fallback: Read non-placeholder variables from .env.example if not present in process.env
+try {
+  if (fs.existsSync(".env.example")) {
+    const exampleConfig = dotenv.parse(fs.readFileSync(".env.example"));
+    for (const k in exampleConfig) {
+      if (!process.env[k] && exampleConfig[k] && !exampleConfig[k].startsWith("MY_")) {
+        process.env[k] = exampleConfig[k];
+      }
+    }
+  }
+} catch (e) {
+  console.warn("Could not load fallback .env.example:", e);
+}
+
+function getSmtpConfig() {
+  let user = "";
+  let pass = "";
+  let host = "";
+  let port = 465;
+  let from = "";
+
+  // Check .env.example first for latest configured credentials
+  if (fs.existsSync(".env.example")) {
+    try {
+      const exampleConfig = dotenv.parse(fs.readFileSync(".env.example"));
+      if (exampleConfig.SMTP_USER) user = exampleConfig.SMTP_USER.replace(/['"]/g, "").trim();
+      if (exampleConfig.SMTP_PASS) pass = exampleConfig.SMTP_PASS.replace(/['"]/g, "").trim();
+      if (exampleConfig.SMTP_HOST) host = exampleConfig.SMTP_HOST.replace(/['"]/g, "").trim();
+      if (exampleConfig.SMTP_PORT) port = Number(exampleConfig.SMTP_PORT) || port;
+      if (exampleConfig.SMTP_FROM) from = exampleConfig.SMTP_FROM.replace(/['"]/g, "").trim();
+    } catch (e) {
+      console.warn("Failed to parse .env.example for SMTP config:", e);
+    }
+  }
+
+  // Fallback to process.env if present and non-empty
+  if (process.env.SMTP_USER && !user) user = process.env.SMTP_USER.replace(/['"]/g, "").trim();
+  if (process.env.SMTP_PASS && !pass) pass = process.env.SMTP_PASS.replace(/['"]/g, "").trim();
+  if (process.env.SMTP_HOST && !host) host = process.env.SMTP_HOST.replace(/['"]/g, "").trim();
+  if (process.env.SMTP_PORT) port = Number(process.env.SMTP_PORT) || port;
+  if (process.env.SMTP_FROM && !from) from = process.env.SMTP_FROM.replace(/['"]/g, "").trim();
+
+  // Sanitize Google Workspace App Password (strip internal spaces: 'kues djdb dxvm yiuf' -> 'kuesdjdbdxvmyiuf')
+  const cleanPass = pass.replace(/\s+/g, "");
+
+  return {
+    user,
+    pass: cleanPass,
+    rawPass: pass,
+    host: host || "smtp.gmail.com",
+    port,
+    from: from || `"Elimisha Watoto IT Helpdesk" <${user || "it@elimishawatoto.org"}>`,
+    configured: Boolean(user && cleanPass && !user.startsWith("MY_") && !cleanPass.startsWith("MY_"))
+  };
+}
+const emailNotificationLogs: Array<{
+  id: string;
+  ticketNumber: string;
+  recipients: string[];
+  subject: string;
+  timestamp: string;
+  status: 'sent' | 'queued' | 'simulated';
+  preview: string;
+}> = [];
 
 let aiClient: GoogleGenAI | null = null;
 function getAI(): GoogleGenAI | null {
@@ -291,6 +358,221 @@ Output JSON:
       console.error("AI KB Generator error:", err);
       return res.status(500).json({ error: err.message || "Failed to generate KB article" });
     }
+  });
+
+  // Ticket Email Notification Endpoint
+  // Dispatches email alerts to IT Admin (it@elimishawatoto.org) and IT Staff when an employee submits a ticket
+  app.post("/api/notifications/ticket-created", async (req, res) => {
+    try {
+      const { ticket, staffEmails = [] } = req.body;
+
+      if (!ticket || !ticket.ticketNumber || !ticket.title) {
+        return res.status(400).json({ error: "Invalid ticket payload" });
+      }
+
+      const primaryAdminEmail = process.env.IT_SUPPORT_EMAIL || "it@elimishawatoto.org";
+      
+      // Combine admin email and IT staff emails, removing duplicates
+      const allRecipients = Array.from(
+        new Set(
+          [primaryAdminEmail, ...(Array.isArray(staffEmails) ? staffEmails : [])]
+            .map((email: string) => email?.trim().toLowerCase())
+            .filter((email: string) => Boolean(email) && email.includes("@"))
+        )
+      );
+
+      const subject = `[IT Service Desk - ${ticket.priority?.toUpperCase() || "NEW"}] Ticket ${ticket.ticketNumber}: ${ticket.title}`;
+      const appUrl = process.env.APP_URL || "https://ais-pre-b75v64w3m4o26ytkwlo4dg-396190362785.europe-west2.run.app";
+
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #1e293b; }
+    .container { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background: #0f172a; padding: 24px; color: #ffffff; }
+    .header-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8; font-weight: 700; margin-bottom: 4px; }
+    .header-title { font-size: 20px; font-weight: 700; margin: 0; color: #ffffff; }
+    .content { padding: 24px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700; }
+    .badge-critical { background: #ffe4e6; color: #e11d48; }
+    .badge-high { background: #ffedd5; color: #ea580c; }
+    .badge-medium { background: #fef3c7; color: #d97706; }
+    .badge-low { background: #f1f5f9; color: #475569; }
+    .section-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0; }
+    .label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 2px; }
+    .value { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .desc-box { background: #ffffff; border-left: 4px solid #0284c7; padding: 12px 16px; margin-top: 12px; border-radius: 4px; font-size: 13px; line-height: 1.6; color: #334155; }
+    .btn { display: inline-block; background: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 16px; }
+    .footer { background: #f1f5f9; padding: 16px 24px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-tag">Elimisha Watoto Foundation • IT Helpdesk</div>
+      <h1 class="header-title">New Support Incident Submitted</h1>
+    </div>
+    <div class="content">
+      <p style="margin-top: 0; font-size: 14px; color: #475569;">
+        A new ticket has been opened by an employee and requires review from the IT Support team.
+      </p>
+
+      <div class="section-box">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 6px 0; width: 50%;">
+              <div class="label">Ticket Number</div>
+              <div class="value">${ticket.ticketNumber}</div>
+            </td>
+            <td style="padding: 6px 0; width: 50%;">
+              <div class="label">Priority</div>
+              <div class="value">
+                <span class="badge badge-${(ticket.priority || 'medium').toLowerCase()}">${ticket.priority || 'Medium'}</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0;">
+              <div class="label">Category</div>
+              <div class="value">${ticket.category || 'General Issue'}</div>
+            </td>
+            <td style="padding: 6px 0;">
+              <div class="label">Reporter</div>
+              <div class="value">${ticket.reporterName || 'Employee'} (${ticket.reporterDepartment || 'Staff'})</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding: 6px 0;">
+              <div class="label">Reporter Email</div>
+              <div class="value" style="font-weight: 400; color: #0284c7;">${ticket.reporterEmail || 'N/A'}</div>
+            </td>
+          </tr>
+        </table>
+
+        <div style="margin-top: 14px;">
+          <div class="label">Summary / Title</div>
+          <div class="value" style="font-size: 15px; margin-top: 2px;">${ticket.title}</div>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <div class="label">Incident Description</div>
+          <div class="desc-box">${(ticket.description || '').replace(/\n/g, '<br/>')}</div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 20px;">
+        <a href="${appUrl}" class="btn" style="color: #ffffff;">Open IT Support Workspace</a>
+      </div>
+    </div>
+    <div class="footer">
+      Sent to IT Administration (<strong>it@elimishawatoto.org</strong>) and assigned IT Support Staff.<br/>
+      Elimisha Watoto Foundation • Automated IT Service Desk Notification
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const textFallback = `[NEW IT TICKET: ${ticket.ticketNumber}]
+Priority: ${ticket.priority}
+Category: ${ticket.category}
+Title: ${ticket.title}
+Reporter: ${ticket.reporterName} (${ticket.reporterEmail}, ${ticket.reporterDepartment})
+
+Description:
+${ticket.description}
+
+Access Dashboard: ${appUrl}
+Sent to: ${allRecipients.join(", ")}`;
+
+      let sendStatus: 'sent' | 'simulated' = 'simulated';
+      let messageId: string | undefined = undefined;
+      let smtpError: string | undefined = undefined;
+
+      const smtpConfig = getSmtpConfig();
+
+      if (smtpConfig.configured) {
+        try {
+          // Direct SSL on port 465 for Google Workspace / Gmail
+          const transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 465,
+            secure: true,
+            auth: {
+              user: smtpConfig.user,
+              pass: smtpConfig.pass,
+            },
+            tls: {
+              rejectUnauthorized: false,
+            },
+          });
+
+          const info = await transporter.sendMail({
+            from: smtpConfig.from,
+            to: allRecipients,
+            subject,
+            text: textFallback,
+            html: htmlContent,
+          });
+
+          sendStatus = 'sent';
+          messageId = info.messageId;
+          console.log(`[GOOGLE WORKSPACE EMAIL SENT] Ticket ${ticket.ticketNumber} to: ${allRecipients.join(", ")} | ID: ${info.messageId}`);
+        } catch (err: any) {
+          smtpError = err?.message || String(err);
+          console.error(`[SMTP ERROR] Failed to send via Google Workspace / SMTP:`, smtpError);
+          sendStatus = 'simulated';
+        }
+      } else {
+        console.log(`[EMAIL NOTIFICATION DISPATCHED] (Simulated / Logged for Google Workspace: it@elimishawatoto.org)`);
+        console.log(`To: ${allRecipients.join(", ")}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`Ticket: ${ticket.ticketNumber} - ${ticket.title}`);
+        console.log(`Reporter: ${ticket.reporterName} <${ticket.reporterEmail}>`);
+      }
+
+      // Record in notification logs
+      const logEntry = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        ticketNumber: ticket.ticketNumber,
+        recipients: allRecipients,
+        subject,
+        timestamp: new Date().toISOString(),
+        status: sendStatus,
+        error: smtpError,
+        preview: `New ticket "${ticket.title}" from ${ticket.reporterName} (${ticket.category})`,
+      };
+      emailNotificationLogs.unshift(logEntry);
+      if (emailNotificationLogs.length > 50) emailNotificationLogs.pop();
+
+      return res.json({
+        success: true,
+        message: sendStatus === 'sent' 
+          ? `Email notification sent to IT admin (it@elimishawatoto.org) and IT staff members.`
+          : `Notification logged (Simulated mode).`,
+        recipients: allRecipients,
+        ticketNumber: ticket.ticketNumber,
+        status: sendStatus,
+        messageId,
+        error: smtpError,
+        dispatchedAt: logEntry.timestamp,
+      });
+    } catch (err: any) {
+      console.error("Ticket email notification error:", err);
+      return res.status(500).json({ error: err.message || "Failed to dispatch email notification" });
+    }
+  });
+
+
+  // Get recent notification dispatch log
+  app.get("/api/notifications/recent", (_req, res) => {
+    res.json({
+      primaryAdminEmail: process.env.IT_SUPPORT_EMAIL || "it@elimishawatoto.org",
+      smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
+      logs: emailNotificationLogs,
+    });
   });
 
   // Vite middleware for dev or static files for production

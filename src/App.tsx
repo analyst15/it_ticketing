@@ -54,6 +54,7 @@ import { EmployeePortalPage } from './components/EmployeePortalPage';
 import { WorkplacePortalsHub } from './components/WorkplacePortalsHub';
 import { LoginPage } from './components/LoginPage';
 import { ITStaffDashboardView } from './components/ITStaffDashboardView';
+import { sendTicketCreatedNotification } from './utils/notifications';
 
 export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>(() => loadTickets());
@@ -299,6 +300,21 @@ export default function App() {
   const handleCreateTicket = (newTicket: Ticket) => {
     setTickets(prev => [newTicket, ...prev]);
     saveTicketToFirestore(newTicket);
+
+    // Extract all IT staff & admin email addresses
+    const itStaffEmails = users
+      .filter(u => u.role === 'IT Staff' || u.role === 'Admin')
+      .map(u => u.email)
+      .filter(Boolean);
+
+    // Send email alert to IT Admin (it@elimishawatoto.org) and IT Staff
+    sendTicketCreatedNotification(newTicket, itStaffEmails).then(result => {
+      if (result?.success) {
+        console.log(`Email notification dispatched for ticket ${newTicket.ticketNumber} to IT admin & staff:`, result.recipients);
+      }
+    }).catch(err => {
+      console.error('Failed to dispatch ticket notification email:', err);
+    });
   };
 
   const handleUpdateTicket = (updated: Ticket) => {
@@ -307,7 +323,11 @@ export default function App() {
   };
 
   const handleDeleteTicket = (ticketId: string) => {
-    setTickets(prev => prev.filter(t => t.id !== ticketId));
+    setTickets(prev => {
+      const next = prev.filter(t => t.id !== ticketId);
+      saveTickets(next);
+      return next;
+    });
     deleteTicketFromFirestore(ticketId);
     if (selectedTicket?.id === ticketId) {
       setSelectedTicket(null);
@@ -380,7 +400,11 @@ export default function App() {
   };
 
   const handleBulkDelete = (ticketIds: string[]) => {
-    setTickets(prev => prev.filter(t => !ticketIds.includes(t.id)));
+    setTickets(prev => {
+      const next = prev.filter(t => !ticketIds.includes(t.id));
+      saveTickets(next);
+      return next;
+    });
     ticketIds.forEach(id => deleteTicketFromFirestore(id));
   };
 
@@ -524,6 +548,7 @@ export default function App() {
               currentUser={currentUser}
               onSelectTicket={t => setSelectedTicket(t)}
               onUpdateTicket={handleUpdateTicket}
+              onDeleteTicket={handleDeleteTicket}
               onOpenCreateTicket={() => {
                 setCreatePrefill({});
                 setShowCreateModal(true);
@@ -642,6 +667,7 @@ export default function App() {
           ticket={selectedTicket}
           onClose={() => setSelectedTicket(null)}
           onUpdateTicket={handleUpdateTicket}
+          onDeleteTicket={handleDeleteTicket}
           onAddComment={handleAddComment}
           assets={assets}
           onGenerateKBArticle={handleGenerateKBArticleFromTicket}

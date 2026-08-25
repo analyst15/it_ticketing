@@ -50,12 +50,14 @@ export const UsersView: React.FC<UsersViewProps> = ({
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
+    password?: string;
     role: UserRole;
     department: string;
     status: UserStatus;
   }>({
     name: '',
     email: '',
+    password: '',
     role: 'Employee',
     department: 'Engineering',
     status: 'Active',
@@ -91,6 +93,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
     setFormData({
       name: '',
       email: '',
+      password: 'employee123',
       role: 'Employee',
       department: 'Engineering',
       status: 'Active',
@@ -104,6 +107,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
     setFormData({
       name: user.name,
       email: user.email,
+      password: user.password || (user.role === 'Admin' ? 'admin123' : user.role === 'IT Staff' ? 'staff123' : 'employee123'),
       role: user.role,
       department: user.department,
       status: user.status,
@@ -126,12 +130,20 @@ export const UsersView: React.FC<UsersViewProps> = ({
       setFormError('Please enter a department.');
       return;
     }
+    if (formData.password && formData.password.trim().length < 4) {
+      setFormError('Password must be at least 4 characters long.');
+      return;
+    }
+
+    const defaultPw = formData.role === 'Admin' ? 'admin123' : formData.role === 'IT Staff' ? 'staff123' : 'employee123';
+    const finalPassword = formData.password?.trim() || defaultPw;
 
     if (editingUser && onUpdateUser) {
       onUpdateUser({
         ...editingUser,
         name: formData.name.trim(),
         email: formData.email.trim(),
+        password: finalPassword,
         role: formData.role,
         department: formData.department.trim(),
         status: formData.status,
@@ -140,6 +152,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
       onAddUser({
         name: formData.name.trim(),
         email: formData.email.trim(),
+        password: finalPassword,
         role: formData.role,
         department: formData.department.trim(),
         status: formData.status,
@@ -542,6 +555,22 @@ export const UsersView: React.FC<UsersViewProps> = ({
                   placeholder="e.g. Engineering, IT Support, Marketing"
                   className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Account Password <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.password}
+                  onChange={e => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="e.g. employee123"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Default passwords: Admin (<code className="text-purple-600 font-bold">admin123</code>), IT Staff (<code className="text-sky-600 font-bold">staff123</code>), Employee (<code className="text-blue-600 font-bold">employee123</code>).
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">

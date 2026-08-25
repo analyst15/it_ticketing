@@ -64,6 +64,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         return;
       }
 
+      // Strict Password Verification
+      const expectedPassword = matchedUser.password || (matchedUser.role === 'Admin' ? 'admin123' : (matchedUser.role === 'IT Staff' ? 'staff123' : 'employee123'));
+      if (password !== expectedPassword) {
+        setErrorMessage('Invalid credentials. The password you entered is incorrect.');
+        return;
+      }
+
       const targetPortal: 'admin' | 'employee' = (matchedUser.role === 'Admin' || matchedUser.role === 'IT Staff') 
         ? 'admin' 
         : 'employee';
@@ -74,8 +81,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   // Quick 1-Click Select Profile
   const handleQuickSelect = (user: UserAccount) => {
+    const userPassword = user.password || (user.role === 'Admin' ? 'admin123' : (user.role === 'IT Staff' ? 'staff123' : 'employee123'));
     setEmail(user.email);
-    setPassword('••••••••');
+    setPassword(userPassword);
     setErrorMessage('');
     
     const targetPortal: 'admin' | 'employee' = (user.role === 'Admin' || user.role === 'IT Staff')
@@ -170,7 +178,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     type="button"
                     onClick={() => {
                       setEmail('sarah.chen@company.com');
-                      setPassword('staff123');
+                      setPassword('employee123');
                     }}
                     className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                   >

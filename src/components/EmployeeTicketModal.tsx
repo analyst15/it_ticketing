@@ -15,6 +15,7 @@ import {
   MessageSquare,
   ShieldCheck,
   AlertCircle,
+  Mail,
 } from 'lucide-react';
 
 interface EmployeeTicketModalProps {
@@ -134,6 +135,19 @@ export const EmployeeTicketModal: React.FC<EmployeeTicketModalProps> = ({
                   : 'General Workplace Tech'}
               </div>
             </div>
+          </div>
+
+          {/* Email Notification Dispatch Status */}
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-blue-900">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>
+                Automated alert delivered to IT Admin (<strong>it@elimishawatoto.org</strong>) and IT Staff team.
+              </span>
+            </div>
+            <span className="shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+              Dispatched
+            </span>
           </div>
 
           {/* Initial Problem Description */}

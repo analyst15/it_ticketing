@@ -21,6 +21,7 @@ import {
   KeyRound,
   FileText,
   Wifi,
+  Printer,
 } from 'lucide-react';
 
 export const PriorityBadge: React.FC<{ priority: TicketPriority; showIcon?: boolean }> = ({
@@ -140,6 +141,8 @@ export const CategoryBadge: React.FC<{ category: TicketCategory; showIcon?: bool
         return <Wifi className="w-3.5 h-3.5" />;
       case 'Equipment Request':
         return <Package className="w-3.5 h-3.5" />;
+      case 'Printer Toner depleted':
+        return <Printer className="w-3.5 h-3.5" />;
       case 'Hardware':
         return <Laptop className="w-3.5 h-3.5" />;
       case 'Access & IAM':

@@ -92,6 +92,8 @@ export async function seedInitialFirestoreDataIfEmpty(): Promise<void> {
 // TICKETS REALTIME SYNC & OPERATIONS
 // ==========================================
 
+let isInitialTicketsLoaded = false;
+
 export function subscribeTickets(
   onData: (tickets: Ticket[]) => void,
   onError?: (err: Error) => void
@@ -102,6 +104,7 @@ export function subscribeTickets(
       colRef,
       (snapshot) => {
         if (!snapshot.empty) {
+          isInitialTicketsLoaded = true;
           const tickets: Ticket[] = [];
           snapshot.forEach((docSnap) => {
             tickets.push(docSnap.data() as Ticket);
@@ -111,10 +114,21 @@ export function subscribeTickets(
           saveLocalTickets(tickets);
           onData(tickets);
         } else {
-          // If Firestore is empty, seed and fallback to local
-          const local = loadLocalTickets();
-          onData(local);
-          seedInitialFirestoreDataIfEmpty();
+          // If Firestore is empty on the very first initial load and local is also empty, seed defaults
+          if (!isInitialTicketsLoaded) {
+            const local = loadLocalTickets();
+            if (local && local.length > 0) {
+              onData(local);
+            } else {
+              onData([]);
+              seedInitialFirestoreDataIfEmpty();
+            }
+            isInitialTicketsLoaded = true;
+          } else {
+            // Intentionally empty (e.g. all tickets deleted)
+            saveLocalTickets([]);
+            onData([]);
+          }
         }
       },
       (err) => {
