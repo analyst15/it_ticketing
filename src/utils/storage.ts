@@ -5,21 +5,90 @@ const TICKETS_KEY = 'it_desk_tickets_v1';
 const KB_KEY = 'it_desk_kb_articles_v1';
 const ASSETS_KEY = 'it_desk_assets_v1';
 const USERS_KEY = 'it_desk_users_v1';
+const DELETED_USERS_KEY = 'it_desk_deleted_user_ids_v1';
+const INITIALIZED_FLAG = 'it_desk_db_initialized_v2';
+
+export function getDeletedUserIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_USERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse deleted user IDs from localStorage:', e);
+  }
+  return new Set();
+}
+
+export function recordDeletedUserId(userId: string): void {
+  try {
+    const set = getDeletedUserIds();
+    set.add(userId);
+    localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {
+    console.error('Failed to record deleted user ID in localStorage:', e);
+  }
+}
+
+export function clearDeletedUserIds(): void {
+  try {
+    localStorage.removeItem(DELETED_USERS_KEY);
+  } catch (e) {
+    console.error('Failed to clear deleted user IDs in localStorage:', e);
+  }
+}
 
 export function loadUsers(): UserAccount[] {
+  const deletedIds = getDeletedUserIds();
   try {
     const raw = localStorage.getItem(USERS_KEY);
-    if (raw) {
-      const parsed: UserAccount[] = JSON.parse(raw);
-      return parsed.map(u => ({
-        ...u,
-        password: u.password || (u.role === 'Admin' ? 'admin123' : u.role === 'IT Staff' ? 'staff123' : 'employee123'),
-      }));
+    let parsed: UserAccount[] = [];
+    if (raw !== null) {
+      const stored = JSON.parse(raw);
+      if (Array.isArray(stored)) {
+        parsed = stored;
+      }
     }
+
+    // Merge in any INITIAL_USERS that were not explicitly deleted and are not yet in parsed list
+    const userMap = new Map<string, UserAccount>();
+    INITIAL_USERS.forEach(u => {
+      if (!deletedIds.has(u.id)) {
+        userMap.set(u.id, u);
+      }
+    });
+
+    // Stored/created users take priority
+    parsed.forEach(u => {
+      if (!deletedIds.has(u.id)) {
+        userMap.set(u.id, u);
+      }
+    });
+
+    const merged = Array.from(userMap.values());
+
+    // Ensure it@elimishawatoto.org exists and has password ITEWF@2026 if it was saved with old password
+    const adminIndex = merged.findIndex(u => u.email.toLowerCase() === 'it@elimishawatoto.org');
+    if (adminIndex >= 0) {
+      merged[adminIndex].password = merged[adminIndex].password === 'admin123' ? 'ITEWF@2026' : (merged[adminIndex].password || 'ITEWF@2026');
+      merged[adminIndex].role = 'Admin';
+    } else {
+      // Prepend default admin
+      const defaultAdmin = INITIAL_USERS.find(u => u.email.toLowerCase() === 'it@elimishawatoto.org');
+      if (defaultAdmin) merged.unshift(defaultAdmin);
+    }
+
+    return merged.map(u => ({
+      ...u,
+      password: u.password || (u.email.toLowerCase() === 'it@elimishawatoto.org' ? 'ITEWF@2026' : (u.role === 'Admin' ? 'ITEWF@2026' : u.role === 'IT Staff' ? 'staff123' : 'password123')),
+    }));
   } catch (e) {
     console.error('Failed to load users from localStorage:', e);
   }
-  return INITIAL_USERS;
+  return INITIAL_USERS.filter(u => !deletedIds.has(u.id));
 }
 
 export function saveUsers(users: UserAccount[]): void {
@@ -33,11 +102,18 @@ export function saveUsers(users: UserAccount[]): void {
 export function loadTickets(): Ticket[] {
   try {
     const raw = localStorage.getItem(TICKETS_KEY);
-    if (raw) {
-      return JSON.parse(raw);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
     }
   } catch (e) {
     console.error('Failed to load tickets from localStorage:', e);
+  }
+  // Check if system is initialized
+  if (localStorage.getItem(INITIALIZED_FLAG)) {
+    return [];
   }
   return INITIAL_TICKETS;
 }
@@ -45,6 +121,7 @@ export function loadTickets(): Ticket[] {
 export function saveTickets(tickets: Ticket[]): void {
   try {
     localStorage.setItem(TICKETS_KEY, JSON.stringify(tickets));
+    localStorage.setItem(INITIALIZED_FLAG, 'true');
   } catch (e) {
     console.error('Failed to save tickets to localStorage:', e);
   }
@@ -53,8 +130,11 @@ export function saveTickets(tickets: Ticket[]): void {
 export function loadKBArticles(): KBArticle[] {
   try {
     const raw = localStorage.getItem(KB_KEY);
-    if (raw) {
-      return JSON.parse(raw);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
     }
   } catch (e) {
     console.error('Failed to load KB articles from localStorage:', e);
@@ -73,14 +153,18 @@ export function saveKBArticles(articles: KBArticle[]): void {
 export function loadAssets(): ITAsset[] {
   try {
     const raw = localStorage.getItem(ASSETS_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].laptopModel) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (e) {
     console.error('Failed to load assets from localStorage:', e);
+  }
+  // Check if system is initialized
+  if (localStorage.getItem(INITIALIZED_FLAG)) {
+    return [];
   }
   return INITIAL_ASSETS;
 }
@@ -88,21 +172,47 @@ export function loadAssets(): ITAsset[] {
 export function saveAssets(assets: ITAsset[]): void {
   try {
     localStorage.setItem(ASSETS_KEY, JSON.stringify(assets));
+    localStorage.setItem(INITIALIZED_FLAG, 'true');
   } catch (e) {
     console.error('Failed to save assets to localStorage:', e);
   }
 }
 
+/**
+ * Resets local cache and state with default sample data
+ */
 export function resetToDefaults() {
-  localStorage.removeItem(TICKETS_KEY);
-  localStorage.removeItem(KB_KEY);
-  localStorage.removeItem(ASSETS_KEY);
-  localStorage.removeItem(USERS_KEY);
+  localStorage.setItem(TICKETS_KEY, JSON.stringify(INITIAL_TICKETS));
+  localStorage.setItem(KB_KEY, JSON.stringify(INITIAL_KB_ARTICLES));
+  localStorage.setItem(ASSETS_KEY, JSON.stringify(INITIAL_ASSETS));
+  localStorage.setItem(USERS_KEY, JSON.stringify(INITIAL_USERS));
+  localStorage.setItem(INITIALIZED_FLAG, 'true');
   return {
     tickets: INITIAL_TICKETS,
     kbArticles: INITIAL_KB_ARTICLES,
     assets: INITIAL_ASSETS,
     users: INITIAL_USERS,
+  };
+}
+
+/**
+ * Completely purges all demo tickets and hardware assets from local storage
+ */
+export function purgeLocalDemoData() {
+  localStorage.setItem(TICKETS_KEY, JSON.stringify([]));
+  localStorage.setItem(ASSETS_KEY, JSON.stringify([]));
+  localStorage.setItem(INITIALIZED_FLAG, 'true');
+  
+  // Keep admin user so active administrator stays authenticated
+  const currentUsers = loadUsers();
+  const adminUsers = currentUsers.filter(u => u.role === 'Admin');
+  const safeUsers = adminUsers.length > 0 ? adminUsers : INITIAL_USERS.filter(u => u.role === 'Admin');
+  localStorage.setItem(USERS_KEY, JSON.stringify(safeUsers));
+
+  return {
+    tickets: [],
+    assets: [],
+    users: safeUsers,
   };
 }
 

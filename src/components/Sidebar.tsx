@@ -12,6 +12,8 @@ import {
   Globe,
   ListTodo,
   X,
+  LifeBuoy,
+  UserCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -47,10 +49,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const secondaryNavItems = [
+    { id: 'employee-portal', label: 'Employee Portal', icon: UserCheck, isAction: true },
     { id: 'portals' as AppViewMode, label: 'Workplace Portals', icon: Globe },
     { id: 'kb' as AppViewMode, label: 'Knowledge Base', icon: BookOpen },
     { id: 'assets' as AppViewMode, label: 'Asset Inventory', icon: Laptop2 },
-    { id: 'portal' as AppViewMode, label: 'Staff Support Portal', icon: HelpCircle },
   ];
 
   const handleNavClick = (viewId: AppViewMode) => {
@@ -137,11 +139,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     key={item.id}
                     onClick={() => {
-                      if (item.id === 'portal' && onSwitchToEmployeePortal) {
+                      if (item.id === 'employee-portal' && onSwitchToEmployeePortal) {
                         onSwitchToEmployeePortal();
                         onCloseMobile?.();
                       } else {
-                        handleNavClick(item.id);
+                        handleNavClick(item.id as AppViewMode);
                       }
                     }}
                     className={`w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all cursor-pointer flex items-center gap-3 font-medium ${

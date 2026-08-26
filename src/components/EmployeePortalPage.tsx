@@ -19,6 +19,10 @@ import {
   Search,
   Plus,
   Laptop,
+  Smartphone,
+  Mouse,
+  Mic,
+  Camera,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -39,6 +43,10 @@ import {
   AlertCircle,
   ChevronRight,
   Inbox,
+  LifeBuoy,
+  ShieldCheck,
+  Layers,
+  Wrench,
 } from 'lucide-react';
 
 interface EmployeePortalPageProps {
@@ -63,6 +71,7 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   onCreateTicket,
   onAddComment,
   onUpvoteKBArticle,
+  onSwitchToAdmin,
   onLogout,
 }) => {
   // Active Tab
@@ -250,14 +259,120 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   const [isTriaging, setIsTriaging] = useState(false);
   const [aiTip, setAiTip] = useState<string | null>(null);
 
-  // Find devices belonging to the selected employee in the 13-field inventory
+  // Find devices belonging strictly to the selected employee in the 13-field inventory
   const employeeAssets = useMemo(() => {
     return assets.filter(
-      (a) =>
-        a.employeeName.toLowerCase().trim() === selectedEmployeeName.toLowerCase().trim() ||
-        (a.department && a.department.toLowerCase() === selectedEmployeeDept.toLowerCase())
+      (a) => a.employeeName.toLowerCase().trim() === selectedEmployeeName.toLowerCase().trim()
     );
-  }, [assets, selectedEmployeeName, selectedEmployeeDept]);
+  }, [assets, selectedEmployeeName]);
+
+  // Breakdown/Categorization of individual physical devices & peripherals issued to this employee
+  interface CategorizedItem {
+    id: string;
+    type: 'Laptop' | 'Phone' | 'Mouse' | 'Lapel Mic' | 'Tripod';
+    name: string;
+    modelOrSerial: string;
+    conditionOrDetails: string;
+    additionalInfo?: string;
+    reportCategory: TicketCategory;
+    reportDefaultSubject: string;
+    iconType: 'laptop' | 'smartphone' | 'mouse' | 'mic' | 'camera';
+  }
+
+  const categorizedDevices = useMemo(() => {
+    const items: CategorizedItem[] = [];
+
+    employeeAssets.forEach((asset, assetIdx) => {
+      // 1. Laptop Device
+      if (asset.laptopModel && asset.laptopModel.trim() && asset.laptopModel.toLowerCase() !== 'none') {
+        items.push({
+          id: `${asset.id}-laptop-${assetIdx}`,
+          type: 'Laptop',
+          name: asset.laptopModel,
+          modelOrSerial: asset.laptopSerialNumber ? `S/N: ${asset.laptopSerialNumber}` : 'Registered Laptop',
+          conditionOrDetails: asset.laptopConditionComments || 'Good working condition',
+          additionalInfo: asset.laptopPrice ? `Value: ${asset.laptopPrice}` : undefined,
+          reportCategory: 'Laptop not charging or turning on',
+          reportDefaultSubject: `Hardware issue on ${asset.laptopModel} (${asset.laptopSerialNumber || 'No S/N'})`,
+          iconType: 'laptop',
+        });
+      }
+
+      // 2. Phone Device
+      if (asset.phoneModel && asset.phoneModel.trim() && asset.phoneModel.toLowerCase() !== 'none' && asset.phoneModel.toLowerCase() !== 'n/a') {
+        const lines: string[] = [];
+        if (asset.safaricomPhoneNumber && asset.safaricomPhoneNumber.toLowerCase() !== 'n/a') {
+          lines.push(`Safaricom: ${asset.safaricomPhoneNumber}`);
+        }
+        if (asset.airtelPhoneNumber && asset.airtelPhoneNumber.toLowerCase() !== 'n/a') {
+          lines.push(`Airtel: ${asset.airtelPhoneNumber}`);
+        }
+        items.push({
+          id: `${asset.id}-phone-${assetIdx}`,
+          type: 'Phone',
+          name: asset.phoneModel,
+          modelOrSerial: lines.length > 0 ? lines.join(' • ') : 'Company Cellular Phone',
+          conditionOrDetails: asset.phoneConditionComments || 'Good Condition',
+          additionalInfo: asset.phonePrice ? `Value: ${asset.phonePrice}` : undefined,
+          reportCategory: 'Hardware',
+          reportDefaultSubject: `Phone issue on ${asset.phoneModel} (${asset.safaricomPhoneNumber || asset.airtelPhoneNumber || 'No SIM'})`,
+          iconType: 'smartphone',
+        });
+      }
+
+      // 3. Mouse Accessory / Device
+      if (asset.issuedWithMouse === 'Yes') {
+        items.push({
+          id: `${asset.id}-mouse-${assetIdx}`,
+          type: 'Mouse',
+          name: 'Optical Ergonomic Mouse',
+          modelOrSerial: 'Standard USB / Wireless Mouse',
+          conditionOrDetails: 'Issued with primary workstation',
+          reportCategory: 'Keyboard or mouse not working',
+          reportDefaultSubject: `Mouse not working properly for ${selectedEmployeeName}`,
+          iconType: 'mouse',
+        });
+      }
+
+      // 4. Lapel Mic Accessory / Device
+      if (asset.issuedWithMic === 'Yes') {
+        items.push({
+          id: `${asset.id}-mic-${assetIdx}`,
+          type: 'Lapel Mic',
+          name: 'Wireless / Lapel Microphone',
+          modelOrSerial: 'Audio Recording & Meeting Accessory',
+          conditionOrDetails: 'Issued for field / media & meetings',
+          reportCategory: 'Hardware',
+          reportDefaultSubject: `Microphone issue reported by ${selectedEmployeeName}`,
+          iconType: 'mic',
+        });
+      }
+
+      // 5. Tripod Accessory / Device
+      if (asset.issuedWithTripod === 'Yes') {
+        items.push({
+          id: `${asset.id}-tripod-${assetIdx}`,
+          type: 'Tripod',
+          name: 'Adjustable Camera / Phone Tripod',
+          modelOrSerial: 'Mounting & Media Accessory',
+          conditionOrDetails: 'Issued for field media & sessions',
+          reportCategory: 'Hardware',
+          reportDefaultSubject: `Tripod issue reported by ${selectedEmployeeName}`,
+          iconType: 'camera',
+        });
+      }
+    });
+
+    return items;
+  }, [employeeAssets, selectedEmployeeName]);
+
+  // Selected filter within the My Devices tab
+  const [deviceTypeFilter, setDeviceTypeFilter] = useState<'All' | 'Laptop' | 'Phone' | 'Mouse' | 'Lapel Mic' | 'Tripod'>('All');
+
+  const filteredCategorizedDevices = useMemo(() => {
+    if (deviceTypeFilter === 'All') return categorizedDevices;
+    return categorizedDevices.filter(d => d.type === deviceTypeFilter);
+  }, [categorizedDevices, deviceTypeFilter]);
 
   // Tickets for this employee
   const employeeTickets = useMemo(() => {
@@ -375,7 +490,7 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               <img
                 src="https://firebasestorage.googleapis.com/v0/b/ilearn-cc226.firebasestorage.app/o/EWF%20Main.png?alt=media&token=3e05f629-7f10-44ba-a0a9-e901a63010c8"
                 alt="EWF Logo"
-                className="h-8 max-h-8 w-auto object-contain"
+                className="h-9 sm:h-11 max-h-11 w-auto object-contain"
                 referrerPolicy="no-referrer"
               />
               <div className="h-5 w-px bg-slate-200 hidden sm:block" />
@@ -567,8 +682,23 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
                       </div>
                     </div>
 
+                    {(currentUser?.role === 'Admin' || currentUser?.role === 'IT Staff') && onSwitchToAdmin && (
+                      <div className="pt-2 border-t border-slate-100 mt-2">
+                        <button
+                          onClick={() => {
+                            setShowProfileSwitcher(false);
+                            onSwitchToAdmin();
+                          }}
+                          className="w-full py-2 px-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+                        >
+                          <LifeBuoy className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Switch to IT Staff Portal</span>
+                        </button>
+                      </div>
+                    )}
+
                     {onLogout && (
-                      <div className="pt-3 border-t border-slate-100 mt-2">
+                      <div className="pt-2 border-t border-slate-100 mt-2">
                         <button
                           onClick={() => {
                             setShowProfileSwitcher(false);
@@ -688,7 +818,7 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
                 }`}
               >
                 <Laptop className="w-4 h-4" />
-                <span>My Devices ({employeeAssets.length})</span>
+                <span>My Devices ({categorizedDevices.length})</span>
               </button>
 
               <button
@@ -836,106 +966,244 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
           </div>
         )}
 
-        {/* 4. My Issued Devices Tab (13-field electronic device inventory) */}
+        {/* 4. My Issued Devices Tab (Categorized individual device & peripheral view) */}
         {activeTab === 'devices' && !showRequestForm && (
           <div className="space-y-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+            {/* Header & Stats Banner */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Laptop className="w-5 h-5 text-blue-600" />
-                  My Assigned Electronic Devices & Accessories ({employeeAssets.length})
+                  <span>My Assigned Devices & Accessories</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                    {categorizedDevices.length} Total {categorizedDevices.length === 1 ? 'Device' : 'Devices'}
+                  </span>
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Electronic hardware issued to <strong className="text-slate-800">{selectedEmployeeName}</strong>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Itemized hardware, mobile phones, and peripherals registered strictly under <strong className="text-slate-800">{selectedEmployeeName}</strong>
                 </p>
               </div>
+
+              {/* Categorized Filter Pills */}
+              {categorizedDevices.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl text-xs">
+                  <button
+                    onClick={() => setDeviceTypeFilter('All')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                      deviceTypeFilter === 'All'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All ({categorizedDevices.length})
+                  </button>
+
+                  {['Laptop', 'Phone', 'Mouse', 'Lapel Mic', 'Tripod'].map((typeKey) => {
+                    const count = categorizedDevices.filter(d => d.type === typeKey).length;
+                    if (count === 0) return null;
+                    return (
+                      <button
+                        key={typeKey}
+                        onClick={() => setDeviceTypeFilter(typeKey as any)}
+                        className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                          deviceTypeFilter === typeKey
+                            ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {typeKey === 'Laptop' && <Laptop className="w-3.5 h-3.5" />}
+                        {typeKey === 'Phone' && <Smartphone className="w-3.5 h-3.5" />}
+                        {typeKey === 'Mouse' && <Mouse className="w-3.5 h-3.5" />}
+                        {typeKey === 'Lapel Mic' && <Mic className="w-3.5 h-3.5" />}
+                        {typeKey === 'Tripod' && <Camera className="w-3.5 h-3.5" />}
+                        <span>{typeKey} ({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {employeeAssets.map((asset) => (
+            {/* Quick Summary Grid of Issued Hardware Categories */}
+            {categorizedDevices.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {[
+                  {
+                    type: 'Laptop',
+                    label: 'Laptops',
+                    count: categorizedDevices.filter(d => d.type === 'Laptop').length,
+                    icon: Laptop,
+                    color: 'text-blue-600 bg-blue-50 border-blue-200',
+                  },
+                  {
+                    type: 'Phone',
+                    label: 'Phones & SIMs',
+                    count: categorizedDevices.filter(d => d.type === 'Phone').length,
+                    icon: Smartphone,
+                    color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+                  },
+                  {
+                    type: 'Mouse',
+                    label: 'Mice',
+                    count: categorizedDevices.filter(d => d.type === 'Mouse').length,
+                    icon: Mouse,
+                    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+                  },
+                  {
+                    type: 'Lapel Mic',
+                    label: 'Lapel Mics',
+                    count: categorizedDevices.filter(d => d.type === 'Lapel Mic').length,
+                    icon: Mic,
+                    color: 'text-purple-600 bg-purple-50 border-purple-200',
+                  },
+                  {
+                    type: 'Tripod',
+                    label: 'Tripods',
+                    count: categorizedDevices.filter(d => d.type === 'Tripod').length,
+                    icon: Camera,
+                    color: 'text-amber-600 bg-amber-50 border-amber-200',
+                  },
+                ].map((cat) => (
+                  <div
+                    key={cat.type}
+                    onClick={() => setDeviceTypeFilter(deviceTypeFilter === cat.type ? 'All' : cat.type as any)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer text-center sm:text-left flex items-center gap-3 ${
+                      cat.count > 0 ? 'bg-white border-slate-200 hover:border-blue-300' : 'bg-slate-50/70 border-slate-100 opacity-60'
+                    } ${deviceTypeFilter === cat.type ? 'ring-2 ring-blue-500 bg-blue-50/40' : ''}`}
+                  >
+                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${cat.color}`}>
+                      <cat.icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-extrabold text-slate-900">{cat.count}</div>
+                      <div className="text-[11px] text-slate-500 truncate font-medium">{cat.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Individual Categorized Devices Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCategorizedDevices.map((item) => (
                 <div
-                  key={asset.id}
-                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4 hover:border-blue-300 transition-all"
+                  key={item.id}
+                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-blue-300 hover:shadow-md transition-all group"
                 >
-                  {/* Laptop Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-600">
-                        <Laptop className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-slate-900">{asset.laptopModel}</h3>
-                        <span className="font-mono text-xs text-slate-500 block">S/N: {asset.laptopSerialNumber}</span>
+                  <div className="space-y-3.5">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 shadow-2xs ${
+                            item.type === 'Laptop'
+                              ? 'bg-blue-50 border-blue-200 text-blue-600'
+                              : item.type === 'Phone'
+                              ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                              : item.type === 'Mouse'
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                              : item.type === 'Lapel Mic'
+                              ? 'bg-purple-50 border-purple-200 text-purple-600'
+                              : 'bg-amber-50 border-amber-200 text-amber-600'
+                          }`}
+                        >
+                          {item.type === 'Laptop' && <Laptop className="w-5 h-5" />}
+                          {item.type === 'Phone' && <Smartphone className="w-5 h-5" />}
+                          {item.type === 'Mouse' && <Mouse className="w-5 h-5" />}
+                          {item.type === 'Lapel Mic' && <Mic className="w-5 h-5" />}
+                          {item.type === 'Tripod' && <Camera className="w-5 h-5" />}
+                        </div>
+
+                        <div className="min-w-0">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide mb-1 ${
+                              item.type === 'Laptop'
+                                ? 'bg-blue-100 text-blue-800'
+                                : item.type === 'Phone'
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : item.type === 'Mouse'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : item.type === 'Lapel Mic'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {item.type}
+                          </span>
+                          <h3 className="font-bold text-sm text-slate-900 truncate leading-snug group-hover:text-blue-600 transition-colors">
+                            {item.name}
+                          </h3>
+                        </div>
                       </div>
                     </div>
 
-                    <button
-                      onClick={() =>
-                        handleOpenFormWithCategory(
-                          'Laptop not charging or turning on',
-                          `Issue reported on ${asset.laptopModel} (${asset.laptopSerialNumber})`
-                        )
-                      }
-                      className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold border border-red-200 cursor-pointer transition-all"
-                    >
-                      Report Issue
-                    </button>
+                    {/* Meta Specs & Status */}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px]">Identifier / Spec</span>
+                        <span className="font-semibold text-slate-800 font-mono text-[11px] truncate max-w-[170px]" title={item.modelOrSerial}>
+                          {item.modelOrSerial}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px]">Condition / Note</span>
+                        <span className="font-medium text-slate-700 text-[11px] truncate max-w-[170px]" title={item.conditionOrDetails}>
+                          {item.conditionOrDetails}
+                        </span>
+                      </div>
+
+                      {item.additionalInfo && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                          <span className="text-slate-400 text-[11px]">Asset Value</span>
+                          <span className="font-semibold text-emerald-700 text-[11px]">
+                            {item.additionalInfo}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* 13-field Spec Details */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3.5 rounded-xl bg-slate-50 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Laptop Condition</span>
-                      <strong className="text-slate-800">{asset.laptopConditionComments || 'Good Condition'}</strong>
-                    </div>
+                  {/* Actions */}
+                  <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Assigned to you
+                    </span>
 
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Mouse Issued</span>
-                      <strong className={asset.issuedWithMouse === 'Yes' ? 'text-emerald-700' : 'text-slate-500'}>
-                        {asset.issuedWithMouse}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Tripod Issued</span>
-                      <strong className={asset.issuedWithTripod === 'Yes' ? 'text-emerald-700' : 'text-slate-500'}>
-                        {asset.issuedWithTripod}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Lapel Mic</span>
-                      <strong className={asset.issuedWithMic === 'Yes' ? 'text-emerald-700' : 'text-slate-500'}>
-                        {asset.issuedWithMic}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Phone Model</span>
-                      <strong className="text-slate-800">{asset.phoneModel || 'None'}</strong>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Safaricom Line</span>
-                      <strong className="text-slate-800">{asset.safaricomPhoneNumber || 'N/A'}</strong>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase">Airtel Line</span>
-                      <strong className="text-slate-800">{asset.airtelPhoneNumber || 'N/A'}</strong>
-                    </div>
+                    <button
+                      onClick={() => handleOpenFormWithCategory(item.reportCategory, item.reportDefaultSubject)}
+                      className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 hover:border-red-300 transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Report Issue</span>
+                    </button>
                   </div>
                 </div>
               ))}
 
-              {employeeAssets.length === 0 && (
+              {filteredCategorizedDevices.length === 0 && categorizedDevices.length > 0 && (
+                <div className="col-span-full p-8 bg-white border border-slate-200 rounded-2xl text-center text-slate-500 space-y-2">
+                  <p className="text-xs sm:text-sm font-semibold text-slate-700">
+                    No {deviceTypeFilter} devices found in your inventory.
+                  </p>
+                  <button
+                    onClick={() => setDeviceTypeFilter('All')}
+                    className="px-3.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700"
+                  >
+                    View all {categorizedDevices.length} devices
+                  </button>
+                </div>
+              )}
+
+              {categorizedDevices.length === 0 && (
                 <div className="col-span-full p-10 bg-white border border-slate-200 rounded-2xl text-center text-slate-400 space-y-2">
                   <Laptop className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-xs sm:text-sm font-medium text-slate-600">
-                    No hardware assets registered under {selectedEmployeeName}.
+                    No hardware assets or peripherals registered under {selectedEmployeeName}.
                   </p>
                   <p className="text-xs text-slate-400">
-                    Switch profiles in the top right to view other employees or contact IT inventory.
+                    If you have received equipment that is not listed, please submit a ticket under "Equipment Request".
                   </p>
                 </div>
               )}
@@ -946,6 +1214,13 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
         {/* 3. Staff Workplace Portals & Services Tab */}
         {activeTab === 'portals' && (
           <WorkplacePortalsHub
+            onOpenPortal={(portalUrl) => {
+              if (portalUrl === '/' || portalUrl === '/admin') {
+                if (onSwitchToAdmin) {
+                  onSwitchToAdmin();
+                }
+              }
+            }}
             onRequestHelpWithPortal={(portalName, portalUrl) => {
               setFormCategory('Software (App errors, Activation Keys)');
               setFormTitle(`Issue accessing ${portalName} (${portalUrl})`);

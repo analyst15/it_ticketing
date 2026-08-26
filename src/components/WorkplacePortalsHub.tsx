@@ -13,15 +13,18 @@ import {
   Globe,
   Sparkles,
   FolderSync,
+  Headphones,
 } from 'lucide-react';
 
 interface WorkplacePortalsHubProps {
   onRequestHelpWithPortal?: (portalName: string, portalUrl: string) => void;
+  onOpenPortal?: (portalUrl: string) => void;
   compact?: boolean;
 }
 
 export const WorkplacePortalsHub: React.FC<WorkplacePortalsHubProps> = ({
   onRequestHelpWithPortal,
+  onOpenPortal,
   compact = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,6 +33,8 @@ export const WorkplacePortalsHub: React.FC<WorkplacePortalsHubProps> = ({
 
   const getPortalIcon = (id: string) => {
     switch (id) {
+      case 'it-support-portal':
+        return <LifeBuoy className="w-5 h-5 text-blue-600 shrink-0" />;
       case 'sharepoint-portal':
         return <FolderSync className="w-5 h-5 text-teal-600 shrink-0" />;
       case 'sapama-erp':
@@ -90,15 +95,26 @@ export const WorkplacePortalsHub: React.FC<WorkplacePortalsHubProps> = ({
             </div>
 
             <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-              <a
-                href={portal.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs ${portal.colorScheme.btnBg}`}
-              >
-                <span>Launch</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              {portal.url.startsWith('/') ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenPortal?.(portal.url)}
+                  className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer ${portal.colorScheme.btnBg}`}
+                >
+                  <span>Open Portal</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <a
+                  href={portal.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs ${portal.colorScheme.btnBg}`}
+                >
+                  <span>Launch</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
           </div>
         ))}
@@ -220,15 +236,26 @@ export const WorkplacePortalsHub: React.FC<WorkplacePortalsHubProps> = ({
                 </span>
               )}
 
-              <a
-                href={portal.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer ${portal.colorScheme.btnBg}`}
-              >
-                <span>Launch Portal</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              {portal.url.startsWith('/') ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenPortal?.(portal.url)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer ${portal.colorScheme.btnBg}`}
+                >
+                  <span>Launch IT Portal</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <a
+                  href={portal.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer ${portal.colorScheme.btnBg}`}
+                >
+                  <span>Launch Portal</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
           </div>
         ))}

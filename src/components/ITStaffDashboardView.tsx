@@ -13,6 +13,7 @@ import {
   X,
   UserPlus,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { IT_AGENTS } from '../data/mockData';
 
@@ -21,6 +22,7 @@ interface ITStaffDashboardViewProps {
   currentUser?: UserAccount | null;
   onSelectTicket: (ticket: Ticket) => void;
   onUpdateTicket: (ticket: Ticket) => void;
+  onDeleteTicket?: (ticketId: string) => void;
   onOpenCreateTicket?: () => void;
 }
 
@@ -29,6 +31,7 @@ export const ITStaffDashboardView: React.FC<ITStaffDashboardViewProps> = ({
   currentUser,
   onSelectTicket,
   onUpdateTicket,
+  onDeleteTicket,
   onOpenCreateTicket,
 }) => {
   const [filterMode, setFilterMode] = useState<'all' | 'assigned_to_me' | 'unassigned' | 'high_priority'>('all');
@@ -36,6 +39,7 @@ export const ITStaffDashboardView: React.FC<ITStaffDashboardViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('Active'); // Active = Open + In Progress + Waiting
   const [reassigningTicketId, setReassigningTicketId] = useState<string | null>(null);
+  const [ticketToDelete, setTicketToDelete] = useState<Ticket | null>(null);
 
   // Stats calculation
   const openCount = useMemo(() => {
@@ -648,9 +652,20 @@ export const ITStaffDashboardView: React.FC<ITStaffDashboardViewProps> = ({
                         </div>
                       </td>
 
-                      {/* Column 5: Status Pill */}
-                      <td className="py-4 sm:py-5 px-4 sm:px-6 text-right whitespace-nowrap">
-                        {renderStatusPill(ticket.status)}
+                      {/* Column 5: Status Pill & Delete action */}
+                      <td className="py-4 sm:py-5 px-4 sm:px-6 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2.5">
+                          {renderStatusPill(ticket.status)}
+                          {onDeleteTicket && (
+                            <button
+                              onClick={() => setTicketToDelete(ticket)}
+                              title="Delete ticket"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -666,6 +681,40 @@ export const ITStaffDashboardView: React.FC<ITStaffDashboardViewProps> = ({
           <span className="font-bold text-slate-700">Priority Queue Active</span>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Delete Ticket {ticketToDelete.ticketNumber}?</h3>
+            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+              Are you sure you want to permanently delete ticket <span className="font-semibold text-slate-800">"{ticketToDelete.title}"</span>? All associated notes and diagnostic logs will be removed.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteTicket?.(ticketToDelete.id);
+                  setTicketToDelete(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Delete Ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

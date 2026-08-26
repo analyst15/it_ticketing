@@ -301,12 +301,7 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
 
               {/* Bulk Delete */}
               <button
-                onClick={() => {
-                  if (confirm(`Are you sure you want to delete ${selectedTicketIds.length} tickets?`)) {
-                    onBulkDelete(selectedTicketIds);
-                    setSelectedTicketIds([]);
-                  }
-                }}
+                onClick={() => setShowBulkDeleteConfirm(true)}
                 className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -333,12 +328,13 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
                   </button>
                 </th>
                 <th className="p-3.5 w-24">Ticket ID</th>
-                <th className="p-3.5 min-w-[280px]">Subject & Description</th>
+                <th className="p-3.5 min-w-[260px]">Subject & Description</th>
                 <th className="p-3.5 w-32">Category</th>
                 <th className="p-3.5 w-24">Priority</th>
                 <th className="p-3.5 w-28">Status</th>
                 <th className="p-3.5 w-36">Assignee</th>
                 <th className="p-3.5 w-28">Reporter</th>
+                <th className="p-3.5 w-20 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -349,7 +345,7 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
                   <tr
                     key={ticket.id}
                     onClick={() => onSelectTicket(ticket)}
-                    className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
+                    className={`hover:bg-slate-50/80 transition-colors cursor-pointer group ${
                       isSelected ? 'bg-blue-50/80' : ''
                     }`}
                   >
@@ -413,13 +409,24 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
                       <div className="text-slate-800 font-medium">{ticket.reporterName}</div>
                       <div className="text-[10px] text-slate-500">{ticket.reporterDepartment}</div>
                     </td>
+
+                    {/* Actions */}
+                    <td className="p-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => setTicketToDelete(ticket)}
+                        title="Delete ticket"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
 
               {filteredTickets.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-slate-400">
+                  <td colSpan={9} className="p-10 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Layers className="w-8 h-8 text-slate-400" />
                       <p className="font-medium text-sm text-slate-700">No tickets found matching your filters.</p>
@@ -441,6 +448,75 @@ export const TicketTableView: React.FC<TicketTableViewProps> = ({
           <span className="text-[11px] text-slate-400">Real-time ticket telemetry</span>
         </div>
       </div>
+
+      {/* Single Ticket Delete Confirmation Dialog */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Delete Ticket {ticketToDelete.ticketNumber}?</h3>
+            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+              Are you sure you want to permanently delete ticket <span className="font-semibold text-slate-800">"{ticketToDelete.title}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteTicket(ticketToDelete.id);
+                  setTicketToDelete(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Delete Ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Dialog */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Delete {selectedTicketIds.length} Selected Tickets?</h3>
+            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+              Are you sure you want to permanently delete <span className="font-semibold text-slate-800">{selectedTicketIds.length} tickets</span>? All associated notes, audit history, and records will be removed.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onBulkDelete(selectedTicketIds);
+                  setSelectedTicketIds([]);
+                  setShowBulkDeleteConfirm(false);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Delete {selectedTicketIds.length} Tickets
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

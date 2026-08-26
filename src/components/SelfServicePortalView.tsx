@@ -25,12 +25,14 @@ interface SelfServicePortalViewProps {
   tickets: Ticket[];
   onOpenCreateWithCategory: (category: TicketCategory, initialTitle?: string) => void;
   onSelectTicket: (ticket: Ticket) => void;
+  onSwitchToEmployeePortal?: () => void;
 }
 
 export const SelfServicePortalView: React.FC<SelfServicePortalViewProps> = ({
   tickets,
   onOpenCreateWithCategory,
   onSelectTicket,
+  onSwitchToEmployeePortal,
 }) => {
   const [portalSearch, setPortalSearch] = useState('');
 
@@ -159,6 +161,12 @@ export const SelfServicePortalView: React.FC<SelfServicePortalViewProps> = ({
       {/* Staff Workplace Portals & Services Hub */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs">
         <WorkplacePortalsHub
+          onOpenPortal={(url) => {
+            if (url === '/' || url === '/admin') {
+              // IT Staff Portal
+              window.location.href = '/';
+            }
+          }}
           onRequestHelpWithPortal={(portalName, portalUrl) => {
             onOpenCreateWithCategory(
               'Software (App errors, Activation Keys)',

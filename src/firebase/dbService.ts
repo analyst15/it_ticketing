@@ -21,6 +21,8 @@ import {
   saveUsers as saveLocalUsers,
   loadKBArticles as loadLocalKBArticles,
   saveKBArticles as saveLocalKBArticles,
+  getDeletedUserIds,
+  recordDeletedUserId,
 } from '../utils/storage';
 
 const TICKETS_COLLECTION = 'tickets';
@@ -29,70 +31,139 @@ const USERS_COLLECTION = 'users';
 const KB_COLLECTION = 'kbArticles';
 
 // ==========================================
-// SEEDING HELPERS (Initial Firestore Bootstrap)
+// SEEDING & PURGE HELPERS
 // ==========================================
 
-export async function seedInitialFirestoreDataIfEmpty(): Promise<void> {
+/**
+ * Manually loads mock/sample data into Firestore on user demand.
+ */
+export async function seedSampleDataToFirestore(): Promise<void> {
   try {
     await ensureFirebaseAuth();
 
-    // 1. Check Tickets
+    // 1. Seed Tickets
+    const tBatch = writeBatch(db);
+    INITIAL_TICKETS.forEach((t) => {
+      const docRef = doc(db, TICKETS_COLLECTION, t.id);
+      tBatch.set(docRef, t);
+    });
+    await tBatch.commit();
+
+    // 2. Seed Assets
+    const aBatch = writeBatch(db);
+    INITIAL_ASSETS.forEach((a) => {
+      const docRef = doc(db, ASSETS_COLLECTION, a.id);
+      aBatch.set(docRef, a);
+    });
+    await aBatch.commit();
+
+    // 3. Seed Users
+    const uBatch = writeBatch(db);
+    INITIAL_USERS.forEach((u) => {
+      const docRef = doc(db, USERS_COLLECTION, u.id);
+      uBatch.set(docRef, u);
+    });
+    await uBatch.commit();
+
+    // 4. Seed KB Articles
+    const kbBatch = writeBatch(db);
+    INITIAL_KB_ARTICLES.forEach((kb) => {
+      const docRef = doc(db, KB_COLLECTION, kb.id);
+      kbBatch.set(docRef, kb);
+    });
+    await kbBatch.commit();
+  } catch (err) {
+    console.error('Error seeding sample data to Firestore:', err);
+    throw err;
+  }
+}
+
+/**
+ * Completely purges all tickets and hardware assets from Firestore
+ * so staff can input genuine organizational data cleanly.
+ */
+export async function purgeAllDemoDataFromFirestore(): Promise<void> {
+  try {
+    await ensureFirebaseAuth();
+
+    // Delete all tickets
     const ticketSnap = await getDocs(collection(db, TICKETS_COLLECTION));
-    if (ticketSnap.empty) {
-      console.log('Seeding initial tickets to Firestore...');
+    if (!ticketSnap.empty) {
       const batch = writeBatch(db);
-      INITIAL_TICKETS.forEach((t) => {
-        const docRef = doc(db, TICKETS_COLLECTION, t.id);
-        batch.set(docRef, t);
-      });
+      ticketSnap.forEach((d) => batch.delete(d.ref));
       await batch.commit();
     }
+    saveLocalTickets([]);
 
-    // 2. Check Assets
+    // Delete all assets
     const assetSnap = await getDocs(collection(db, ASSETS_COLLECTION));
-    if (assetSnap.empty) {
-      console.log('Seeding initial IT device inventory to Firestore...');
+    if (!assetSnap.empty) {
       const batch = writeBatch(db);
-      INITIAL_ASSETS.forEach((a) => {
-        const docRef = doc(db, ASSETS_COLLECTION, a.id);
-        batch.set(docRef, a);
-      });
+      assetSnap.forEach((d) => batch.delete(d.ref));
       await batch.commit();
     }
+    saveLocalAssets([]);
 
-    // 3. Check Users
+    // Ensure non-admin demo staff are cleared, but keep primary admin accounts for login
     const userSnap = await getDocs(collection(db, USERS_COLLECTION));
-    if (userSnap.empty) {
-      console.log('Seeding initial user accounts to Firestore...');
+    if (!userSnap.empty) {
       const batch = writeBatch(db);
-      INITIAL_USERS.forEach((u) => {
-        const docRef = doc(db, USERS_COLLECTION, u.id);
-        batch.set(docRef, u);
-      });
-      await batch.commit();
-    }
-
-    // 4. Check KB Articles
-    const kbSnap = await getDocs(collection(db, KB_COLLECTION));
-    if (kbSnap.empty) {
-      console.log('Seeding initial KB articles to Firestore...');
-      const batch = writeBatch(db);
-      INITIAL_KB_ARTICLES.forEach((kb) => {
-        const docRef = doc(db, KB_COLLECTION, kb.id);
-        batch.set(docRef, kb);
+      userSnap.forEach((d) => {
+        const u = d.data() as UserAccount;
+        // Keep active Admin users so admin doesn't get locked out
+        if (u.role !== 'Admin') {
+          batch.delete(d.ref);
+        }
       });
       await batch.commit();
     }
   } catch (err) {
-    console.warn('Firestore seeding check skipped or offline:', err);
+    console.error('Error purging demo data from Firestore:', err);
+    throw err;
+  }
+}
+
+/**
+ * Delete all tickets from Firestore in batch
+ */
+export async function deleteAllTicketsFromFirestore(): Promise<void> {
+  try {
+    await ensureFirebaseAuth();
+    const snap = await getDocs(collection(db, TICKETS_COLLECTION));
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    saveLocalTickets([]);
+  } catch (err) {
+    console.error('Error deleting all tickets:', err);
+    throw err;
+  }
+}
+
+/**
+ * Delete all assets from Firestore in batch
+ */
+export async function deleteAllAssetsFromFirestore(): Promise<void> {
+  try {
+    await ensureFirebaseAuth();
+    const snap = await getDocs(collection(db, ASSETS_COLLECTION));
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    saveLocalAssets([]);
+  } catch (err) {
+    console.error('Error deleting all assets:', err);
+    throw err;
   }
 }
 
 // ==========================================
 // TICKETS REALTIME SYNC & OPERATIONS
 // ==========================================
-
-let isInitialTicketsLoaded = false;
 
 export function subscribeTickets(
   onData: (tickets: Ticket[]) => void,
@@ -102,30 +173,32 @@ export function subscribeTickets(
     const colRef = collection(db, TICKETS_COLLECTION);
     return onSnapshot(
       colRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (!snapshot.empty) {
-          isInitialTicketsLoaded = true;
           const tickets: Ticket[] = [];
           snapshot.forEach((docSnap) => {
             tickets.push(docSnap.data() as Ticket);
           });
-          // Sort by creation date desc
           tickets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           saveLocalTickets(tickets);
           onData(tickets);
         } else {
-          // If Firestore is empty on the very first initial load and local is also empty, seed defaults
-          if (!isInitialTicketsLoaded) {
-            const local = loadLocalTickets();
-            if (local && local.length > 0) {
-              onData(local);
-            } else {
-              onData([]);
-              seedInitialFirestoreDataIfEmpty();
+          const local = loadLocalTickets();
+          if (local.length > 0) {
+            saveLocalTickets(local);
+            onData(local);
+            try {
+              await ensureFirebaseAuth();
+              const batch = writeBatch(db);
+              local.forEach((t) => {
+                const docRef = doc(db, TICKETS_COLLECTION, t.id);
+                batch.set(docRef, t, { merge: true });
+              });
+              await batch.commit();
+            } catch (seedErr) {
+              console.warn('Auto-sync initial tickets error:', seedErr);
             }
-            isInitialTicketsLoaded = true;
           } else {
-            // Intentionally empty (e.g. all tickets deleted)
             saveLocalTickets([]);
             onData([]);
           }
@@ -194,20 +267,35 @@ export function subscribeAssets(
     const colRef = collection(db, ASSETS_COLLECTION);
     return onSnapshot(
       colRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (!snapshot.empty) {
           const assets: ITAsset[] = [];
           snapshot.forEach((docSnap) => {
             assets.push(docSnap.data() as ITAsset);
           });
-          // Sort by employeeName
           assets.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
           saveLocalAssets(assets);
           onData(assets);
         } else {
           const local = loadLocalAssets();
-          onData(local);
-          seedInitialFirestoreDataIfEmpty();
+          if (local.length > 0) {
+            saveLocalAssets(local);
+            onData(local);
+            try {
+              await ensureFirebaseAuth();
+              const batch = writeBatch(db);
+              local.forEach((a) => {
+                const docRef = doc(db, ASSETS_COLLECTION, a.id);
+                batch.set(docRef, a, { merge: true });
+              });
+              await batch.commit();
+            } catch (seedErr) {
+              console.warn('Auto-sync initial assets error:', seedErr);
+            }
+          } else {
+            saveLocalAssets([]);
+            onData([]);
+          }
         }
       },
       (err) => {
@@ -255,19 +343,65 @@ export function subscribeUsers(
     const colRef = collection(db, USERS_COLLECTION);
     return onSnapshot(
       colRef,
-      (snapshot) => {
+      async (snapshot) => {
+        const deletedIds = getDeletedUserIds();
+        const localUsers = loadLocalUsers();
+
         if (!snapshot.empty) {
-          const users: UserAccount[] = [];
+          const firestoreUsers: UserAccount[] = [];
           snapshot.forEach((docSnap) => {
-            users.push(docSnap.data() as UserAccount);
+            firestoreUsers.push(docSnap.data() as UserAccount);
           });
-          users.sort((a, b) => a.name.localeCompare(b.name));
-          saveLocalUsers(users);
-          onData(users);
+
+          // Merge local/initial users with Firestore users to prevent partial-wipeout
+          const userMap = new Map<string, UserAccount>();
+          localUsers.forEach((u) => {
+            if (!deletedIds.has(u.id)) {
+              userMap.set(u.id, u);
+            }
+          });
+          firestoreUsers.forEach((u) => {
+            if (!deletedIds.has(u.id)) {
+              userMap.set(u.id, u);
+            }
+          });
+
+          const mergedUsers = Array.from(userMap.values());
+          mergedUsers.sort((a, b) => a.name.localeCompare(b.name));
+          saveLocalUsers(mergedUsers);
+          onData(mergedUsers);
+
+          // If Firestore is missing some existing users, background-sync the missing ones
+          if (firestoreUsers.length < mergedUsers.length) {
+            try {
+              await ensureFirebaseAuth();
+              const batch = writeBatch(db);
+              mergedUsers.forEach((u) => {
+                const docRef = doc(db, USERS_COLLECTION, u.id);
+                batch.set(docRef, u, { merge: true });
+              });
+              await batch.commit();
+            } catch (syncErr) {
+              console.warn('Background sync users to Firestore:', syncErr);
+            }
+          }
         } else {
-          const local = loadLocalUsers();
-          onData(local);
-          seedInitialFirestoreDataIfEmpty();
+          // If Firestore collection is empty, seed from local users
+          const initialList = localUsers.filter((u) => !deletedIds.has(u.id));
+          saveLocalUsers(initialList);
+          onData(initialList);
+
+          try {
+            await ensureFirebaseAuth();
+            const batch = writeBatch(db);
+            initialList.forEach((u) => {
+              const docRef = doc(db, USERS_COLLECTION, u.id);
+              batch.set(docRef, u, { merge: true });
+            });
+            await batch.commit();
+          } catch (seedErr) {
+            console.warn('Auto-seed users error:', seedErr);
+          }
         }
       },
       (err) => {
@@ -295,6 +429,10 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
 
 export async function deleteUserFromFirestore(userId: string): Promise<void> {
   try {
+    recordDeletedUserId(userId);
+    const updated = loadLocalUsers().filter((u) => u.id !== userId);
+    saveLocalUsers(updated);
+
     await ensureFirebaseAuth();
     const docRef = doc(db, USERS_COLLECTION, userId);
     await deleteDoc(docRef);
@@ -315,7 +453,7 @@ export function subscribeKBArticles(
     const colRef = collection(db, KB_COLLECTION);
     return onSnapshot(
       colRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (!snapshot.empty) {
           const articles: KBArticle[] = [];
           snapshot.forEach((docSnap) => {
@@ -325,8 +463,24 @@ export function subscribeKBArticles(
           onData(articles);
         } else {
           const local = loadLocalKBArticles();
-          onData(local);
-          seedInitialFirestoreDataIfEmpty();
+          if (local.length > 0) {
+            saveLocalKBArticles(local);
+            onData(local);
+            try {
+              await ensureFirebaseAuth();
+              const batch = writeBatch(db);
+              local.forEach((k) => {
+                const docRef = doc(db, KB_COLLECTION, k.id);
+                batch.set(docRef, k, { merge: true });
+              });
+              await batch.commit();
+            } catch (seedErr) {
+              console.warn('Auto-sync initial KB articles error:', seedErr);
+            }
+          } else {
+            saveLocalKBArticles([]);
+            onData([]);
+          }
         }
       },
       (err) => {

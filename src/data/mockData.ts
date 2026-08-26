@@ -85,7 +85,7 @@ export const INITIAL_USERS: UserAccount[] = [
     id: 'usr-admin',
     name: 'IT Support Admin',
     email: 'it@elimishawatoto.org',
-    password: 'admin123',
+    password: 'ITEWF@2026',
     role: 'Admin',
     department: 'IT Support',
     status: 'Active',

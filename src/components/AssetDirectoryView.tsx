@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ITAsset, Ticket, UserAccount } from '../types';
 import {
   Laptop,
@@ -20,6 +20,10 @@ import {
   FileSpreadsheet,
   Layers,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 interface AssetDirectoryViewProps {
@@ -45,6 +49,25 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [peripheralFilter, setPeripheralFilter] = useState<'All' | 'Mouse' | 'Tripod' | 'Mic'>('All');
+
+  // Responsive Device & Pagination State: 5 per page on laptop (>=1024px), 10 on small devices (<1024px)
+  const [isLaptopOrDesktop, setIsLaptopOrDesktop] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLaptopOrDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const pageSize = isLaptopOrDesktop ? 5 : 10;
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modal State
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -110,6 +133,37 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
 
     return true;
   });
+
+  // Reset page when filters, search query, or page size change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, peripheralFilter, pageSize]);
+
+  // Pagination calculation: 5 per page on laptop (>=1024px), 10 on small devices (<1024px)
+  const totalFilteredCount = filteredAssets.length;
+  const isPaginationThresholdHit = isLaptopOrDesktop
+    ? totalFilteredCount >= 5
+    : totalFilteredCount >= 10;
+
+  const totalPages = isPaginationThresholdHit ? Math.max(1, Math.ceil(totalFilteredCount / pageSize)) : 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const startIndex = isPaginationThresholdHit ? (safeCurrentPage - 1) * pageSize : 0;
+  const endIndex = isPaginationThresholdHit ? Math.min(startIndex + pageSize, totalFilteredCount) : totalFilteredCount;
+  const displayedAssets = isPaginationThresholdHit ? filteredAssets.slice(startIndex, endIndex) : filteredAssets;
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (safeCurrentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (safeCurrentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages];
+  };
 
   // Calculate summary counts
   const totalEmployees = assets.length;
@@ -427,14 +481,36 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredAssets.length === 0 ? (
+              {displayedAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
-                    No staff electronic device records found matching current query.
+                  <td colSpan={6} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Laptop className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">
+                        {assets.length === 0 ? 'No Staff Device Records Found' : 'No records match current filter'}
+                      </h4>
+                      <p className="text-xs text-slate-500 max-w-sm">
+                        {assets.length === 0
+                          ? 'Your inventory database is completely clear of dummy data and ready for you to input real staff laptops, serial numbers, phones, and telecom lines.'
+                          : 'Try clearing your search query or peripheral filters.'}
+                      </p>
+                      {assets.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={handleOpenAddModal}
+                          className="mt-2 inline-flex items-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add First Staff Device Record
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredAssets.map(asset => (
+                displayedAssets.map(asset => (
                   <tr key={asset.id} className="hover:bg-slate-50/70 transition-colors group">
                     {/* 1. Employee Name & Department */}
                     <td className="py-4 px-4 align-top">
@@ -580,6 +656,110 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Table Footer with Responsive Pagination */}
+        <div className="p-3.5 bg-slate-50/70 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Range & Device indicator */}
+          <div className="flex items-center gap-2 flex-wrap text-center sm:text-left">
+            {totalFilteredCount > 0 ? (
+              <span>
+                Showing <strong className="text-slate-800 font-semibold">{isPaginationThresholdHit ? startIndex + 1 : 1}</strong> to{' '}
+                <strong className="text-slate-800 font-semibold">{isPaginationThresholdHit ? endIndex : totalFilteredCount}</strong> of{' '}
+                <strong className="text-slate-800 font-semibold">{totalFilteredCount}</strong> {totalFilteredCount === 1 ? 'device record' : 'device records'}
+                {totalFilteredCount !== assets.length && ` (filtered from ${assets.length})`}
+              </span>
+            ) : (
+              <span>No device records to display</span>
+            )}
+
+            {/* Device Page Size Badge */}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200/70 text-[11px] font-medium text-slate-700">
+              {isLaptopOrDesktop ? (
+                <>
+                  <Laptop className="w-3 h-3 text-slate-600" />
+                  <span>5 / page (Laptop view)</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-3 h-3 text-slate-600" />
+                  <span>10 / page (Small device view)</span>
+                </>
+              )}
+            </span>
+          </div>
+
+          {/* Pagination Controls (active when threshold hit) */}
+          {isPaginationThresholdHit && (
+            <div className="flex items-center gap-1.5 flex-wrap justify-center">
+              {/* First Page */}
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={safeCurrentPage === 1}
+                title="First Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <ChevronsLeft className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Prev Page */}
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={safeCurrentPage === 1}
+                title="Previous Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Page Number Buttons */}
+              <div className="flex items-center gap-1">
+                {getPageNumbers().map((page, idx) => {
+                  if (typeof page === 'string') {
+                    return (
+                      <span key={`dots-${idx}`} className="px-1.5 py-1 text-slate-400 text-xs select-none">
+                        ...
+                      </span>
+                    );
+                  }
+                  const isCurrent = page === safeCurrentPage;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Next Page */}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={safeCurrentPage === totalPages}
+                title="Next Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Last Page */}
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={safeCurrentPage === totalPages}
+                title="Last Page"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                <ChevronsRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

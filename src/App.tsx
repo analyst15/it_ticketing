@@ -21,6 +21,7 @@ import {
   loadUsers,
   saveUsers,
   resetToDefaults,
+  purgeLocalDemoData,
   exportAllDataAsJSON,
   exportTicketsToCSV,
 } from './utils/storage';
@@ -37,6 +38,8 @@ import {
   saveUserToFirestore,
   deleteUserFromFirestore,
   saveKBArticleToFirestore,
+  purgeAllDemoDataFromFirestore,
+  seedSampleDataToFirestore,
 } from './firebase/dbService';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -464,16 +467,29 @@ export default function App() {
   };
 
   // Data management
-  const handleResetData = () => {
-    const res = resetToDefaults();
-    setTickets(res.tickets);
-    setKBArticles(res.kbArticles);
-    setAssets(res.assets);
-    setUsers(res.users);
-    res.tickets.forEach(t => saveTicketToFirestore(t));
-    res.assets.forEach(a => saveAssetToFirestore(a));
-    res.users.forEach(u => saveUserToFirestore(u));
-    res.kbArticles.forEach(kb => saveKBArticleToFirestore(kb));
+  const handleResetData = async () => {
+    try {
+      const res = resetToDefaults();
+      setTickets(res.tickets);
+      setKBArticles(res.kbArticles);
+      setAssets(res.assets);
+      setUsers(res.users);
+      await seedSampleDataToFirestore();
+    } catch (e) {
+      console.error('Failed to reset sample data:', e);
+    }
+  };
+
+  const handlePurgeAllDemoData = async () => {
+    try {
+      const res = purgeLocalDemoData();
+      setTickets([]);
+      setAssets([]);
+      setUsers(res.users);
+      await purgeAllDemoDataFromFirestore();
+    } catch (e) {
+      console.error('Failed to purge demo data:', e);
+    }
   };
 
   const openTicketsCount = tickets.filter(t => t.status !== 'Resolved' && t.status !== 'Closed').length;
@@ -516,6 +532,7 @@ export default function App() {
         onExportJSON={() => exportAllDataAsJSON(tickets, kbArticles, assets)}
         onExportCSV={() => exportTicketsToCSV(tickets)}
         onResetData={handleResetData}
+        onPurgeDemoData={handlePurgeAllDemoData}
         onLogout={handleLogout}
         isAiEnabled={isAiEnabled}
         onSelectTicket={t => setSelectedTicket(t)}
@@ -574,7 +591,6 @@ export default function App() {
             <UsersView
               users={users}
               tickets={tickets}
-              assets={assets}
               onSelectTicket={t => setSelectedTicket(t)}
               onAddUser={handleAddUser}
               onUpdateUser={handleUpdateUser}
@@ -612,6 +628,11 @@ export default function App() {
           {currentView === 'portals' && (
             <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-xs">
               <WorkplacePortalsHub
+                onOpenPortal={(url) => {
+                  if (url === '/' || url === '/admin') {
+                    setCurrentView('dashboard');
+                  }
+                }}
                 onRequestHelpWithPortal={(portalName, portalUrl) => {
                   setCreatePrefill({
                     category: 'Software (App errors, Activation Keys)',
@@ -632,6 +653,7 @@ export default function App() {
                 setShowCreateModal(true);
               }}
               onSelectTicket={t => setSelectedTicket(t)}
+              onSwitchToEmployeePortal={() => switchPortalMode('employee')}
             />
           )}
 

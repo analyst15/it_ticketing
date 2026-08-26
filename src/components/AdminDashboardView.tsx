@@ -1,24 +1,27 @@
 import React, { useState } from 'react';
 import { Ticket, TicketPriority, TicketStatus } from '../types';
-import { Filter, ChevronDown, Check, UserCheck, X, Clock, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Filter, ChevronDown, Check, UserCheck, X, Clock, RefreshCw, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { IT_AGENTS } from '../data/mockData';
 
 interface AdminDashboardViewProps {
   tickets: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
   onUpdateTicket: (ticket: Ticket) => void;
+  onDeleteTicket?: (ticketId: string) => void;
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   tickets,
   onSelectTicket,
   onUpdateTicket,
+  onDeleteTicket,
 }) => {
   const [showFilter, setShowFilter] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [ticketToDelete, setTicketToDelete] = useState<Ticket | null>(null);
 
   // Quick reassign dropdown state
   const [reassignTicketId, setReassignTicketId] = useState<string | null>(null);
@@ -370,12 +373,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                       className="py-4 px-6 whitespace-nowrap text-xs relative"
                       onClick={e => e.stopPropagation()}
                     >
-                      <button
-                        onClick={() => setReassignTicketId(reassignTicketId === ticket.id ? null : ticket.id)}
-                        className="text-[#2563eb] hover:text-blue-800 font-medium text-xs cursor-pointer hover:underline inline-flex items-center gap-1"
-                      >
-                        {isAssigned ? 'Reassign' : 'Assign'}
-                      </button>
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          onClick={() => setReassignTicketId(reassignTicketId === ticket.id ? null : ticket.id)}
+                          className="text-[#2563eb] hover:text-blue-800 font-medium text-xs cursor-pointer hover:underline inline-flex items-center gap-1"
+                        >
+                          {isAssigned ? 'Reassign' : 'Assign'}
+                        </button>
+
+                        {onDeleteTicket && (
+                          <button
+                            onClick={() => setTicketToDelete(ticket)}
+                            title="Delete ticket"
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
 
                       {/* Quick Assign Dropdown Popover */}
                       {reassignTicketId === ticket.id && (
@@ -427,6 +442,40 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">Delete Ticket {ticketToDelete.ticketNumber}?</h3>
+            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+              Are you sure you want to delete ticket <span className="font-semibold text-slate-800">"{ticketToDelete.title}"</span>? This will permanently remove the ticket from Firestore and all related logs.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setTicketToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteTicket?.(ticketToDelete.id);
+                  setTicketToDelete(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Delete Ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
