@@ -6,7 +6,7 @@ const KB_KEY = 'it_desk_kb_articles_v1';
 const ASSETS_KEY = 'it_desk_assets_v1';
 const USERS_KEY = 'it_desk_users_v1';
 const DELETED_USERS_KEY = 'it_desk_deleted_user_ids_v1';
-const INITIALIZED_FLAG = 'it_desk_db_initialized_v2';
+const INITIALIZED_FLAG = 'it_desk_db_initialized_v3';
 
 export function getDeletedUserIds(): Set<string> {
   try {
@@ -41,6 +41,18 @@ export function clearDeletedUserIds(): void {
   }
 }
 
+// Only keep default admin as base user
+const DEFAULT_ADMIN_USER: UserAccount = {
+  id: 'usr-admin-1',
+  name: 'Elimisha IT Administrator',
+  email: 'it@elimishawatoto.org',
+  role: 'Admin',
+  department: 'IT & Systems',
+  status: 'Active',
+  dateAdded: '1/15/2026',
+  password: 'ITEWF@2026',
+};
+
 export function loadUsers(): UserAccount[] {
   const deletedIds = getDeletedUserIds();
   try {
@@ -48,18 +60,17 @@ export function loadUsers(): UserAccount[] {
     let parsed: UserAccount[] = [];
     if (raw !== null) {
       const stored = JSON.parse(raw);
-      if (Array.isArray(stored)) {
+      if (Array.isArray(stored) && stored.length > 0) {
         parsed = stored;
       }
     }
 
-    // Merge in any INITIAL_USERS that were not explicitly deleted and are not yet in parsed list
     const userMap = new Map<string, UserAccount>();
-    INITIAL_USERS.forEach(u => {
-      if (!deletedIds.has(u.id)) {
-        userMap.set(u.id, u);
-      }
-    });
+
+    // Default admin user
+    if (!deletedIds.has(DEFAULT_ADMIN_USER.id)) {
+      userMap.set(DEFAULT_ADMIN_USER.id, DEFAULT_ADMIN_USER);
+    }
 
     // Stored/created users take priority
     parsed.forEach(u => {
@@ -70,15 +81,13 @@ export function loadUsers(): UserAccount[] {
 
     const merged = Array.from(userMap.values());
 
-    // Ensure it@elimishawatoto.org exists and has password ITEWF@2026 if it was saved with old password
+    // Ensure it@elimishawatoto.org exists and has correct admin credentials
     const adminIndex = merged.findIndex(u => u.email.toLowerCase() === 'it@elimishawatoto.org');
     if (adminIndex >= 0) {
       merged[adminIndex].password = merged[adminIndex].password === 'admin123' ? 'ITEWF@2026' : (merged[adminIndex].password || 'ITEWF@2026');
       merged[adminIndex].role = 'Admin';
     } else {
-      // Prepend default admin
-      const defaultAdmin = INITIAL_USERS.find(u => u.email.toLowerCase() === 'it@elimishawatoto.org');
-      if (defaultAdmin) merged.unshift(defaultAdmin);
+      merged.unshift(DEFAULT_ADMIN_USER);
     }
 
     return merged.map(u => ({
@@ -88,7 +97,7 @@ export function loadUsers(): UserAccount[] {
   } catch (e) {
     console.error('Failed to load users from localStorage:', e);
   }
-  return INITIAL_USERS.filter(u => !deletedIds.has(u.id));
+  return [DEFAULT_ADMIN_USER];
 }
 
 export function saveUsers(users: UserAccount[]): void {
@@ -111,11 +120,7 @@ export function loadTickets(): Ticket[] {
   } catch (e) {
     console.error('Failed to load tickets from localStorage:', e);
   }
-  // Check if system is initialized
-  if (localStorage.getItem(INITIALIZED_FLAG)) {
-    return [];
-  }
-  return INITIAL_TICKETS;
+  return [];
 }
 
 export function saveTickets(tickets: Ticket[]): void {
@@ -162,11 +167,7 @@ export function loadAssets(): ITAsset[] {
   } catch (e) {
     console.error('Failed to load assets from localStorage:', e);
   }
-  // Check if system is initialized
-  if (localStorage.getItem(INITIALIZED_FLAG)) {
-    return [];
-  }
-  return INITIAL_ASSETS;
+  return [];
 }
 
 export function saveAssets(assets: ITAsset[]): void {

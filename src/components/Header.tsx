@@ -99,6 +99,13 @@ export const Header: React.FC<HeaderProps> = ({
             }`}>
               {displayRole}
             </span>
+            <div 
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium"
+              title="Firebase Firestore Cloud Database Connected: elimisha-2739f (ai-studio-itsupportdesk-cc4c29aa-867a-4231-939f-0a38c52e4baa)"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Firebase Cloud DB Active</span>
+            </div>
           </div>
 
           {/* Quick Workplace Portals Menu */}

@@ -47,6 +47,11 @@ import {
   ShieldCheck,
   Layers,
   Wrench,
+  Mail,
+  Users,
+  AtSign,
+  Send,
+  PhoneCall,
 } from 'lucide-react';
 
 interface EmployeePortalPageProps {
@@ -75,7 +80,7 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   onLogout,
 }) => {
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'tickets' | 'devices' | 'portals' | 'kb' | 'notifications'>('tickets');
+  const [activeTab, setActiveTab] = useState<'tickets' | 'devices' | 'staff' | 'portals' | 'kb' | 'notifications'>('tickets');
 
   // Employee Identity (derived from currentUser or localStorage)
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>(() => {
@@ -373,6 +378,106 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
     if (deviceTypeFilter === 'All') return categorizedDevices;
     return categorizedDevices.filter(d => d.type === deviceTypeFilter);
   }, [categorizedDevices, deviceTypeFilter]);
+
+  // Color themes for individual device category cards
+  const getDeviceTheme = (type: 'Laptop' | 'Phone' | 'Mouse' | 'Lapel Mic' | 'Tripod') => {
+    switch (type) {
+      case 'Laptop':
+        return {
+          cardBg: 'bg-gradient-to-br from-blue-50/90 via-sky-50/60 to-white border-blue-200/90 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-100/50',
+          topBar: 'bg-blue-600',
+          iconWrapper: 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100',
+          badgeClass: 'bg-blue-600 text-white border-blue-700 shadow-2xs',
+          specBox: 'bg-white/85 border-blue-100/90 text-slate-700 shadow-2xs',
+          specLabel: 'text-blue-800/70',
+          titleHover: 'group-hover:text-blue-700',
+          footerBorder: 'border-blue-100',
+          reportBtn: 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300 font-bold',
+        };
+      case 'Phone':
+        return {
+          cardBg: 'bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-white border-indigo-200/90 hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-100/50',
+          topBar: 'bg-indigo-600',
+          iconWrapper: 'bg-indigo-600 text-white shadow-sm ring-4 ring-indigo-100',
+          badgeClass: 'bg-indigo-600 text-white border-indigo-700 shadow-2xs',
+          specBox: 'bg-white/85 border-indigo-100/90 text-slate-700 shadow-2xs',
+          specLabel: 'text-indigo-800/70',
+          titleHover: 'group-hover:text-indigo-700',
+          footerBorder: 'border-indigo-100',
+          reportBtn: 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300 font-bold',
+        };
+      case 'Mouse':
+        return {
+          cardBg: 'bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-white border-emerald-200/90 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-100/50',
+          topBar: 'bg-emerald-600',
+          iconWrapper: 'bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-100',
+          badgeClass: 'bg-emerald-600 text-white border-emerald-700 shadow-2xs',
+          specBox: 'bg-white/85 border-emerald-100/90 text-slate-700 shadow-2xs',
+          specLabel: 'text-emerald-800/70',
+          titleHover: 'group-hover:text-emerald-700',
+          footerBorder: 'border-emerald-100',
+          reportBtn: 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300 font-bold',
+        };
+      case 'Lapel Mic':
+        return {
+          cardBg: 'bg-gradient-to-br from-purple-50/90 via-fuchsia-50/60 to-white border-purple-200/90 hover:border-purple-400 hover:shadow-lg hover:shadow-purple-100/50',
+          topBar: 'bg-purple-600',
+          iconWrapper: 'bg-purple-600 text-white shadow-sm ring-4 ring-purple-100',
+          badgeClass: 'bg-purple-600 text-white border-purple-700 shadow-2xs',
+          specBox: 'bg-white/85 border-purple-100/90 text-slate-700 shadow-2xs',
+          specLabel: 'text-purple-800/70',
+          titleHover: 'group-hover:text-purple-700',
+          footerBorder: 'border-purple-100',
+          reportBtn: 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300 font-bold',
+        };
+      case 'Tripod':
+        return {
+          cardBg: 'bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-white border-amber-200/90 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-100/50',
+          topBar: 'bg-amber-600',
+          iconWrapper: 'bg-amber-600 text-white shadow-sm ring-4 ring-amber-100',
+          badgeClass: 'bg-amber-600 text-white border-amber-700 shadow-2xs',
+          specBox: 'bg-white/85 border-amber-100/90 text-slate-700 shadow-2xs',
+          specLabel: 'text-amber-800/70',
+          titleHover: 'group-hover:text-amber-700',
+          footerBorder: 'border-amber-100',
+          reportBtn: 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300 font-bold',
+        };
+    }
+  };
+
+  // Staff Emails & Directory State
+  const [staffSearchTerm, setStaffSearchTerm] = useState('');
+  const [staffDeptFilter, setStaffDeptFilter] = useState('All');
+  const [copiedStaffEmail, setCopiedStaffEmail] = useState<string | null>(null);
+
+  const handleCopyStaffEmail = (email: string) => {
+    navigator.clipboard.writeText(email);
+    setCopiedStaffEmail(email);
+    setTimeout(() => setCopiedStaffEmail(null), 2000);
+  };
+
+  const staffDepartments = useMemo(() => {
+    const depts = new Set<string>();
+    users.forEach((u) => {
+      if (u.department) depts.add(u.department);
+    });
+    return ['All', ...Array.from(depts)];
+  }, [users]);
+
+  const filteredStaff = useMemo(() => {
+    return users.filter((u) => {
+      const term = staffSearchTerm.toLowerCase().trim();
+      const matchSearch =
+        !term ||
+        u.name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term) ||
+        (u.department && u.department.toLowerCase().includes(term)) ||
+        u.role.toLowerCase().includes(term);
+
+      const matchDept = staffDeptFilter === 'All' || u.department === staffDeptFilter;
+      return matchSearch && matchDept;
+    });
+  }, [users, staffSearchTerm, staffDeptFilter]);
 
   // Tickets for this employee
   const employeeTickets = useMemo(() => {
@@ -794,87 +899,113 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
 
         {/* Main Content Card with Solid White Background for Maximum Readability */}
         <section className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-6 lg:p-7 space-y-6 relative z-10">
-          {/* Main Tab Navigation Bar */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 pb-4 gap-3">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-              <button
-                onClick={() => setActiveTab('tickets')}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'tickets'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                }`}
+          {/* Main Tab Navigation Bar with Horizontal Scrollbar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 pb-3 gap-3">
+            {/* Horizontal Scrollable Tabs Container */}
+            <div className="w-full lg:flex-1 min-w-0">
+              <nav 
+                aria-label="Portal Tabs" 
+                className="portal-tabs-scrollbar flex items-center gap-2 overflow-x-auto pb-2 scroll-smooth"
               >
-                <Clock className="w-4 h-4" />
-                <span>My Tickets ({employeeTickets.length})</span>
-              </button>
+                <button
+                  id="emp-tab-tickets"
+                  onClick={() => setActiveTab('tickets')}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    activeTab === 'tickets'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  <Clock className={`w-4 h-4 shrink-0 ${activeTab === 'tickets' ? 'text-white' : 'text-blue-600'}`} />
+                  <span>My Tickets ({employeeTickets.length})</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('devices')}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'devices'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                }`}
-              >
-                <Laptop className="w-4 h-4" />
-                <span>My Devices ({categorizedDevices.length})</span>
-              </button>
+                <button
+                  id="emp-tab-devices"
+                  onClick={() => setActiveTab('devices')}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    activeTab === 'devices'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  <Laptop className={`w-4 h-4 shrink-0 ${activeTab === 'devices' ? 'text-white' : 'text-sky-600'}`} />
+                  <span>My Devices ({categorizedDevices.length})</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('portals')}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'portals'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                }`}
-              >
-                <Globe className="w-4 h-4 text-emerald-600" />
-                <span>Workplace Portals ({WORKPLACE_PORTALS.length})</span>
-              </button>
+                <button
+                  id="emp-tab-staff"
+                  onClick={() => setActiveTab('staff')}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    activeTab === 'staff'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  <Mail className={`w-4 h-4 shrink-0 ${activeTab === 'staff' ? 'text-white' : 'text-indigo-600'}`} />
+                  <span>Staff Emails ({users.length})</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('kb')}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'kb'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                }`}
-              >
-                <HelpCircle className="w-4 h-4" />
-                <span>Guides ({kbArticles.length})</span>
-              </button>
+                <button
+                  id="emp-tab-portals"
+                  onClick={() => setActiveTab('portals')}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    activeTab === 'portals'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  <Globe className={`w-4 h-4 shrink-0 ${activeTab === 'portals' ? 'text-white' : 'text-emerald-600'}`} />
+                  <span>Workplace Portals ({WORKPLACE_PORTALS.length})</span>
+                </button>
 
-              <button
-                id="emp-tab-notifications"
-                onClick={() => {
-                  setActiveTab('notifications');
-                  handleMarkAllNotificationsAsRead();
-                }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTab === 'notifications'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                }`}
-              >
-                <Bell className="w-4 h-4" />
-                <span>Notifications</span>
-                {unreadNotificationCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                    {unreadNotificationCount}
-                  </span>
-                )}
-              </button>
+                <button
+                  id="emp-tab-guides"
+                  onClick={() => setActiveTab('kb')}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    activeTab === 'kb'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  <HelpCircle className={`w-4 h-4 shrink-0 ${activeTab === 'kb' ? 'text-white' : 'text-amber-600'}`} />
+                  <span>Guides ({kbArticles.length})</span>
+                </button>
+
+                <button
+                  id="emp-tab-notifications"
+                  onClick={() => {
+                    setActiveTab('notifications');
+                    handleMarkAllNotificationsAsRead();
+                  }}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    activeTab === 'notifications'
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  <Bell className={`w-4 h-4 shrink-0 ${activeTab === 'notifications' ? 'text-white' : 'text-purple-600'}`} />
+                  <span>Notifications</span>
+                  {unreadNotificationCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs">
+                      {unreadNotificationCount}
+                    </span>
+                  )}
+                </button>
+              </nav>
             </div>
 
             {/* "+ Submit New Request" Button */}
-            <button
-              onClick={() => handleOpenFormWithCategory('Keyboard or mouse not working')}
-              className="w-full sm:w-auto justify-center px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition-all cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Support Request</span>
-            </button>
+            <div className="flex items-center shrink-0">
+              <button
+                id="emp-btn-new-request"
+                onClick={() => handleOpenFormWithCategory('Keyboard or mouse not working')}
+                className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition-all cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Support Request</span>
+              </button>
+            </div>
           </div>
 
         {/* 1. My Tickets Tab */}
@@ -970,23 +1101,23 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
         {activeTab === 'devices' && !showRequestForm && (
           <div className="space-y-4">
             {/* Header & Stats Banner */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-slate-50 p-5 rounded-2xl border border-blue-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Laptop className="w-5 h-5 text-blue-600" />
                   <span>My Assigned Devices & Accessories</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white shadow-2xs">
                     {categorizedDevices.length} Total {categorizedDevices.length === 1 ? 'Device' : 'Devices'}
                   </span>
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Itemized hardware, mobile phones, and peripherals registered strictly under <strong className="text-slate-800">{selectedEmployeeName}</strong>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Itemized hardware, mobile phones, and peripherals registered strictly under <strong className="text-slate-900">{selectedEmployeeName}</strong>
                 </p>
               </div>
 
               {/* Categorized Filter Pills */}
               {categorizedDevices.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl text-xs">
+                <div className="flex items-center gap-1.5 flex-wrap bg-white/80 p-1 rounded-xl border border-slate-200 text-xs shadow-2xs">
                   <button
                     onClick={() => setDeviceTypeFilter('All')}
                     className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
@@ -1024,7 +1155,7 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               )}
             </div>
 
-            {/* Quick Summary Grid of Issued Hardware Categories */}
+            {/* Quick Summary Grid of Issued Hardware Categories with Full Vibrant Background Colors */}
             {categorizedDevices.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {[
@@ -1033,154 +1164,155 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
                     label: 'Laptops',
                     count: categorizedDevices.filter(d => d.type === 'Laptop').length,
                     icon: Laptop,
-                    color: 'text-blue-600 bg-blue-50 border-blue-200',
+                    cardBg: 'bg-gradient-to-br from-blue-600 to-sky-700 border-blue-700 text-white shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-sky-800 hover:shadow-lg',
+                    iconBg: 'bg-white/20 text-white shadow-xs backdrop-blur-xs',
+                    countColor: 'text-white font-black',
+                    labelColor: 'text-blue-100 font-bold',
+                    activeStyle: 'ring-4 ring-offset-2 ring-blue-500 scale-[1.02] shadow-lg',
                   },
                   {
                     type: 'Phone',
                     label: 'Phones & SIMs',
                     count: categorizedDevices.filter(d => d.type === 'Phone').length,
                     icon: Smartphone,
-                    color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+                    cardBg: 'bg-gradient-to-br from-indigo-600 to-violet-700 border-indigo-700 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-violet-800 hover:shadow-lg',
+                    iconBg: 'bg-white/20 text-white shadow-xs backdrop-blur-xs',
+                    countColor: 'text-white font-black',
+                    labelColor: 'text-indigo-100 font-bold',
+                    activeStyle: 'ring-4 ring-offset-2 ring-indigo-500 scale-[1.02] shadow-lg',
                   },
                   {
                     type: 'Mouse',
                     label: 'Mice',
                     count: categorizedDevices.filter(d => d.type === 'Mouse').length,
                     icon: Mouse,
-                    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+                    cardBg: 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-700 text-white shadow-md shadow-emerald-500/20 hover:from-emerald-700 hover:to-teal-800 hover:shadow-lg',
+                    iconBg: 'bg-white/20 text-white shadow-xs backdrop-blur-xs',
+                    countColor: 'text-white font-black',
+                    labelColor: 'text-emerald-100 font-bold',
+                    activeStyle: 'ring-4 ring-offset-2 ring-emerald-500 scale-[1.02] shadow-lg',
                   },
                   {
                     type: 'Lapel Mic',
                     label: 'Lapel Mics',
                     count: categorizedDevices.filter(d => d.type === 'Lapel Mic').length,
                     icon: Mic,
-                    color: 'text-purple-600 bg-purple-50 border-purple-200',
+                    cardBg: 'bg-gradient-to-br from-purple-600 to-fuchsia-700 border-purple-700 text-white shadow-md shadow-purple-500/20 hover:from-purple-700 hover:to-fuchsia-800 hover:shadow-lg',
+                    iconBg: 'bg-white/20 text-white shadow-xs backdrop-blur-xs',
+                    countColor: 'text-white font-black',
+                    labelColor: 'text-purple-100 font-bold',
+                    activeStyle: 'ring-4 ring-offset-2 ring-purple-500 scale-[1.02] shadow-lg',
                   },
                   {
                     type: 'Tripod',
                     label: 'Tripods',
                     count: categorizedDevices.filter(d => d.type === 'Tripod').length,
                     icon: Camera,
-                    color: 'text-amber-600 bg-amber-50 border-amber-200',
+                    cardBg: 'bg-gradient-to-br from-amber-600 to-orange-700 border-amber-700 text-white shadow-md shadow-amber-500/20 hover:from-amber-700 hover:to-orange-800 hover:shadow-lg',
+                    iconBg: 'bg-white/20 text-white shadow-xs backdrop-blur-xs',
+                    countColor: 'text-white font-black',
+                    labelColor: 'text-amber-100 font-bold',
+                    activeStyle: 'ring-4 ring-offset-2 ring-amber-500 scale-[1.02] shadow-lg',
                   },
                 ].map((cat) => (
                   <div
                     key={cat.type}
                     onClick={() => setDeviceTypeFilter(deviceTypeFilter === cat.type ? 'All' : cat.type as any)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer text-center sm:text-left flex items-center gap-3 ${
-                      cat.count > 0 ? 'bg-white border-slate-200 hover:border-blue-300' : 'bg-slate-50/70 border-slate-100 opacity-60'
-                    } ${deviceTypeFilter === cat.type ? 'ring-2 ring-blue-500 bg-blue-50/40' : ''}`}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-center sm:text-left flex items-center gap-3 ${
+                      cat.count > 0 ? cat.cardBg : 'bg-slate-100 border-slate-200 text-slate-400 opacity-60'
+                    } ${deviceTypeFilter === cat.type ? cat.activeStyle : ''}`}
                   >
-                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${cat.color}`}>
-                      <cat.icon className="w-4 h-4" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cat.iconBg}`}>
+                      <cat.icon className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-extrabold text-slate-900">{cat.count}</div>
-                      <div className="text-[11px] text-slate-500 truncate font-medium">{cat.label}</div>
+                      <div className={`text-base ${cat.countColor}`}>{cat.count}</div>
+                      <div className={`text-[11px] truncate ${cat.labelColor}`}>{cat.label}</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Individual Categorized Devices Grid */}
+            {/* Individual Categorized Devices Grid with Tailored Colors */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCategorizedDevices.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-blue-300 hover:shadow-md transition-all group"
-                >
-                  <div className="space-y-3.5">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 shadow-2xs ${
-                            item.type === 'Laptop'
-                              ? 'bg-blue-50 border-blue-200 text-blue-600'
-                              : item.type === 'Phone'
-                              ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
-                              : item.type === 'Mouse'
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                              : item.type === 'Lapel Mic'
-                              ? 'bg-purple-50 border-purple-200 text-purple-600'
-                              : 'bg-amber-50 border-amber-200 text-amber-600'
-                          }`}
-                        >
-                          {item.type === 'Laptop' && <Laptop className="w-5 h-5" />}
-                          {item.type === 'Phone' && <Smartphone className="w-5 h-5" />}
-                          {item.type === 'Mouse' && <Mouse className="w-5 h-5" />}
-                          {item.type === 'Lapel Mic' && <Mic className="w-5 h-5" />}
-                          {item.type === 'Tripod' && <Camera className="w-5 h-5" />}
+              {filteredCategorizedDevices.map((item) => {
+                const theme = getDeviceTheme(item.type);
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-2xl p-5 shadow-xs border transition-all flex flex-col justify-between group ${theme.cardBg}`}
+                  >
+                    <div className="space-y-3.5">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${theme.iconWrapper}`}>
+                            {item.type === 'Laptop' && <Laptop className="w-5 h-5" />}
+                            {item.type === 'Phone' && <Smartphone className="w-5 h-5" />}
+                            {item.type === 'Mouse' && <Mouse className="w-5 h-5" />}
+                            {item.type === 'Lapel Mic' && <Mic className="w-5 h-5" />}
+                            {item.type === 'Tripod' && <Camera className="w-5 h-5" />}
+                          </div>
+
+                          <div className="min-w-0">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide mb-1 ${theme.badgeClass}`}
+                            >
+                              {item.type}
+                            </span>
+                            <h3 className={`font-bold text-sm text-slate-900 truncate leading-snug transition-colors ${theme.titleHover}`}>
+                              {item.name}
+                            </h3>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Meta Specs & Status */}
+                      <div className={`p-3.5 rounded-xl border text-xs space-y-2 ${theme.specBox}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[11px] font-semibold ${theme.specLabel}`}>Identifier / Spec</span>
+                          <span className="font-bold text-slate-900 font-mono text-[11px] truncate max-w-[170px]" title={item.modelOrSerial}>
+                            {item.modelOrSerial}
+                          </span>
                         </div>
 
-                        <div className="min-w-0">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide mb-1 ${
-                              item.type === 'Laptop'
-                                ? 'bg-blue-100 text-blue-800'
-                                : item.type === 'Phone'
-                                ? 'bg-indigo-100 text-indigo-800'
-                                : item.type === 'Mouse'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : item.type === 'Lapel Mic'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {item.type}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[11px] font-semibold ${theme.specLabel}`}>Condition / Note</span>
+                          <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[170px]" title={item.conditionOrDetails}>
+                            {item.conditionOrDetails}
                           </span>
-                          <h3 className="font-bold text-sm text-slate-900 truncate leading-snug group-hover:text-blue-600 transition-colors">
-                            {item.name}
-                          </h3>
                         </div>
+
+                        {item.additionalInfo && (
+                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/70">
+                            <span className={`text-[11px] font-semibold ${theme.specLabel}`}>Asset Value</span>
+                            <span className="font-extrabold text-emerald-700 text-[11px]">
+                              {item.additionalInfo}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Meta Specs & Status */}
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 text-[11px]">Identifier / Spec</span>
-                        <span className="font-semibold text-slate-800 font-mono text-[11px] truncate max-w-[170px]" title={item.modelOrSerial}>
-                          {item.modelOrSerial}
-                        </span>
-                      </div>
+                    {/* Actions */}
+                    <div className={`pt-3.5 mt-3.5 border-t flex items-center justify-between gap-2 ${theme.footerBorder}`}>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Assigned to you
+                      </span>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 text-[11px]">Condition / Note</span>
-                        <span className="font-medium text-slate-700 text-[11px] truncate max-w-[170px]" title={item.conditionOrDetails}>
-                          {item.conditionOrDetails}
-                        </span>
-                      </div>
-
-                      {item.additionalInfo && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                          <span className="text-slate-400 text-[11px]">Asset Value</span>
-                          <span className="font-semibold text-emerald-700 text-[11px]">
-                            {item.additionalInfo}
-                          </span>
-                        </div>
-                      )}
+                      <button
+                        onClick={() => handleOpenFormWithCategory(item.reportCategory, item.reportDefaultSubject)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${theme.reportBtn}`}
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Report Issue</span>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Assigned to you
-                    </span>
-
-                    <button
-                      onClick={() => handleOpenFormWithCategory(item.reportCategory, item.reportDefaultSubject)}
-                      className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 hover:border-red-300 transition-all cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Wrench className="w-3.5 h-3.5" />
-                      <span>Report Issue</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {filteredCategorizedDevices.length === 0 && categorizedDevices.length > 0 && (
                 <div className="col-span-full p-8 bg-white border border-slate-200 rounded-2xl text-center text-slate-500 space-y-2">
@@ -1211,7 +1343,194 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
           </div>
         )}
 
-        {/* 3. Staff Workplace Portals & Services Tab */}
+        {/* 3. Staff Emails & Colleague Directory Tab */}
+        {activeTab === 'staff' && (
+          <div className="space-y-4">
+            {/* Header & Search Banner */}
+            <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 p-5 rounded-2xl border border-blue-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-blue-600 text-white shadow-xs">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <span>Staff Email Directory</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white shadow-2xs">
+                        {users.length} Colleague{users.length === 1 ? '' : 's'}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Find workplace email addresses and departments for all colleagues across Elimisha Watoto Foundation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="w-full md:w-80 relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={staffSearchTerm}
+                  onChange={(e) => setStaffSearchTerm(e.target.value)}
+                  placeholder="Search by name, email, or dept..."
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs"
+                />
+                {staffSearchTerm && (
+                  <button
+                    onClick={() => setStaffSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Department Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {staffDepartments.map((dept) => {
+                const count = dept === 'All' ? users.length : users.filter(u => u.department === dept).length;
+                return (
+                  <button
+                    key={dept}
+                    onClick={() => setStaffDeptFilter(dept)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                      staffDeptFilter === dept
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'
+                    }`}
+                  >
+                    <span>{dept}</span>
+                    <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                      staffDeptFilter === dept ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Staff Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredStaff.map((user) => {
+                const isCurrentUser = user.email.toLowerCase() === selectedEmployeeEmail.toLowerCase();
+                const isCopied = copiedStaffEmail === user.email;
+
+                // Initials
+                const initials = user.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .substring(0, 2)
+                  .toUpperCase();
+
+                return (
+                  <div
+                    key={user.id}
+                    className={`rounded-2xl p-5 border transition-all flex flex-col justify-between hover:shadow-md ${
+                      isCurrentUser
+                        ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500/20'
+                        : 'bg-white border-slate-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="space-y-3.5">
+                      {/* User Top Info */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-black text-sm flex items-center justify-center shadow-xs shrink-0">
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h3 className="font-bold text-sm text-slate-900 truncate">
+                                {user.name}
+                              </h3>
+                              {isCurrentUser && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-600 text-white uppercase">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-slate-500 text-xs mt-0.5">
+                              <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate">{user.department || 'Elimisha Foundation'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase border ${
+                            user.role === 'Admin'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : user.role === 'IT Staff'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {user.role}
+                        </span>
+                      </div>
+
+                      {/* Email container box */}
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100/90 flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="font-mono text-xs font-bold text-slate-900 truncate select-all" title={user.email}>
+                          {user.email}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions Bar: Copy Email */}
+                    <div className="pt-3 mt-3 border-t border-slate-100">
+                      <button
+                        onClick={() => handleCopyStaffEmail(user.email)}
+                        className={`w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                          isCopied
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300 shadow-2xs'
+                        }`}
+                      >
+                        {isCopied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-white" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Copy Email</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredStaff.length === 0 && (
+                <div className="col-span-full p-12 bg-white border border-slate-200 rounded-2xl text-center text-slate-400 space-y-3">
+                  <Mail className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-sm font-semibold text-slate-700">No staff members found matching "{staffSearchTerm}"</p>
+                  <p className="text-xs text-slate-400">Try searching by a different name, department, or clearing your filter.</p>
+                  <button
+                    onClick={() => {
+                      setStaffSearchTerm('');
+                      setStaffDeptFilter('All');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold cursor-pointer hover:bg-blue-700"
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 4. Staff Workplace Portals & Services Tab */}
         {activeTab === 'portals' && (
           <WorkplacePortalsHub
             onOpenPortal={(portalUrl) => {

@@ -19,24 +19,6 @@ export interface WorkplacePortal {
 
 export const WORKPLACE_PORTALS: WorkplacePortal[] = [
   {
-    id: 'it-support-portal',
-    name: 'IT Support Portal',
-    shortName: 'IT Staff Console',
-    url: '/',
-    description: 'Elimisha Watoto IT Staff Support & Helpdesk Console for IT administrators and technicians to manage incidents, hardware assets, tier assignments, and system diagnostics.',
-    category: 'ERP & Operations',
-    badge: 'IT Staff Portal',
-    colorScheme: {
-      bg: 'bg-blue-50/50 hover:bg-blue-50/80',
-      border: 'border-blue-200 hover:border-blue-400',
-      text: 'text-blue-900',
-      badgeBg: 'bg-blue-100/90 text-blue-800 border-blue-300',
-      badgeText: 'text-blue-700',
-      btnBg: 'bg-blue-600 hover:bg-blue-700 text-white',
-    },
-    highlights: ['IT Incident Management', 'Asset Tracking & Diagnostics', 'Tier 1/2/3 Support Queue'],
-  },
-  {
     id: 'sharepoint-portal',
     name: 'SharePoint',
     shortName: 'SharePoint',
