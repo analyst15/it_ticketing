@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, TicketCategory, TicketPriority, TicketTier, ITAsset, AITriageData } from '../types';
+import { Ticket, TicketCategory, TicketPriority, TicketTier, ITAsset, AITriageData, ORGANIZATIONAL_DEPARTMENTS } from '../types';
 import {
   X,
   Plus,
@@ -39,9 +39,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [description, setDescription] = useState(initialDescription || '');
   const [category, setCategory] = useState<TicketCategory>(initialCategory || 'Keyboard or mouse not working');
   const [priority, setPriority] = useState<TicketPriority>('Medium');
-  const [reporterName, setReporterName] = useState(defaultReporter?.name || 'Sarah Chen');
-  const [reporterEmail, setReporterEmail] = useState(defaultReporter?.email || 'sarah.chen@enterprise.io');
-  const [reporterDepartment, setReporterDepartment] = useState(defaultReporter?.department || 'Engineering');
+  const [reporterName, setReporterName] = useState(defaultReporter?.name || 'Staff Member');
+  const [reporterEmail, setReporterEmail] = useState(defaultReporter?.email || 'staff@elimishawatoto.org');
+  const [reporterDepartment, setReporterDepartment] = useState(defaultReporter?.department || 'Secondary');
   const [tier, setTier] = useState<TicketTier>('Tier 1 (Helpdesk)');
   const [customTags, setCustomTags] = useState('');
 
@@ -270,12 +270,20 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1">Department</label>
-              <input
-                type="text"
+              <select
                 value={reporterDepartment}
                 onChange={e => setReporterDepartment(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-blue-500 focus:bg-white"
-              />
+              >
+                {reporterDepartment && !ORGANIZATIONAL_DEPARTMENTS.includes(reporterDepartment as any) && (
+                  <option value={reporterDepartment}>{reporterDepartment} (Current)</option>
+                )}
+                {ORGANIZATIONAL_DEPARTMENTS.map(dept => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

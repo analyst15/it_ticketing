@@ -127,6 +127,21 @@ export interface FilterState {
 
 export type AppViewMode = 'dashboard' | 'tickets' | 'users' | 'reports' | 'kanban' | 'portal' | 'kb' | 'assets' | 'portals';
 
+export const ORGANIZATIONAL_DEPARTMENTS = [
+  'Secondary',
+  'Tertiary',
+  'Front Office',
+  'Finance',
+  'Human Resource',
+  'Communications & Media',
+  'IT',
+  'Administration',
+  'Care & Share',
+  'Property',
+] as const;
+
+export type OrganizationalDepartment = (typeof ORGANIZATIONAL_DEPARTMENTS)[number];
+
 export type UserRole = 'Employee' | 'IT Staff' | 'Admin';
 export type UserStatus = 'Active' | 'Inactive';
 

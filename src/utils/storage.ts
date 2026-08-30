@@ -47,7 +47,7 @@ const DEFAULT_ADMIN_USER: UserAccount = {
   name: 'Elimisha IT Administrator',
   email: 'it@elimishawatoto.org',
   role: 'Admin',
-  department: 'IT & Systems',
+  department: 'IT',
   status: 'Active',
   dateAdded: '1/15/2026',
   password: 'ITEWF@2026',

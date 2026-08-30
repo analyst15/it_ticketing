@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserAccount, UserRole, UserStatus, Ticket } from '../types';
+import { UserAccount, UserRole, UserStatus, Ticket, ORGANIZATIONAL_DEPARTMENTS } from '../types';
 import {
   Search,
   UserCheck,
@@ -85,7 +85,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
     email: '',
     password: '',
     role: 'Employee',
-    department: 'Engineering',
+    department: 'Secondary',
     status: 'Active',
   });
   const [formError, setFormError] = useState('');
@@ -150,7 +150,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
       email: '',
       password: 'employee123',
       role: 'Employee',
-      department: 'Engineering',
+      department: 'Secondary',
       status: 'Active',
     });
     setFormError('');
@@ -743,13 +743,22 @@ export const UsersView: React.FC<UsersViewProps> = ({
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Department <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.department}
                     onChange={e => setFormData({ ...formData, department: e.target.value })}
-                    placeholder="e.g. Engineering, Finance"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500"
-                  />
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-blue-500 bg-white"
+                    required
+                  >
+                    {/* Preserve custom legacy department if editing */}
+                    {formData.department && !ORGANIZATIONAL_DEPARTMENTS.includes(formData.department as any) && (
+                      <option value={formData.department}>{formData.department} (Current)</option>
+                    )}
+                    {ORGANIZATIONAL_DEPARTMENTS.map(dept => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

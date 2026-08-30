@@ -38,7 +38,9 @@ import {
   saveUserToFirestore,
   deleteUserFromFirestore,
   saveKBArticleToFirestore,
+  deleteKBArticleFromFirestore,
   purgeAllDemoDataFromFirestore,
+  deleteAllTicketsFromFirestore,
   seedSampleDataToFirestore,
 } from './firebase/dbService';
 import { Header } from './components/Header';
@@ -57,7 +59,7 @@ import { EmployeePortalPage } from './components/EmployeePortalPage';
 import { WorkplacePortalsHub } from './components/WorkplacePortalsHub';
 import { LoginPage } from './components/LoginPage';
 import { ITStaffDashboardView } from './components/ITStaffDashboardView';
-import { sendTicketCreatedNotification } from './utils/notifications';
+import { sendTicketCreatedNotification, sendTicketResolvedNotification } from './utils/notifications';
 
 export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>(() => loadTickets());
@@ -321,8 +323,27 @@ export default function App() {
   };
 
   const handleUpdateTicket = (updated: Ticket) => {
-    setTickets(prev => prev.map(t => (t.id === updated.id ? updated : t)));
+    const prev = tickets.find(t => t.id === updated.id);
+    const wasResolved = prev && (prev.status === 'Resolved' || prev.status === 'Closed');
+    const isNowResolved = updated.status === 'Resolved' || updated.status === 'Closed';
+
+    setTickets(prevList => prevList.map(t => (t.id === updated.id ? updated : t)));
     saveTicketToFirestore(updated);
+
+    // If ticket transitioned to Resolved or Closed, send notification email to the employee
+    if (!wasResolved && isNowResolved) {
+      sendTicketResolvedNotification(
+        updated,
+        updated.resolutionNotes,
+        currentUser?.name || updated.assignedAgent
+      ).then(result => {
+        if (result?.success) {
+          console.log(`Resolution email dispatched to employee (${updated.reporterEmail}) for ticket ${updated.ticketNumber}`);
+        }
+      }).catch(err => {
+        console.error('Failed to send resolution email notification to employee:', err);
+      });
+    }
   };
 
   const handleDeleteTicket = (ticketId: string) => {
@@ -362,26 +383,63 @@ export default function App() {
   const handleUpdateTicketStatus = (ticketId: string, newStatus: TicketStatus) => {
     const target = tickets.find(t => t.id === ticketId);
     if (target) {
+      const wasResolved = target.status === 'Resolved' || target.status === 'Closed';
+      const isNowResolved = newStatus === 'Resolved' || newStatus === 'Closed';
+      const nowIso = new Date().toISOString();
+
       const updated: Ticket = {
         ...target,
         status: newStatus,
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
+        resolvedAt: isNowResolved && !target.resolvedAt ? nowIso : target.resolvedAt,
       };
       setTickets(prev => prev.map(t => (t.id === ticketId ? updated : t)));
       saveTicketToFirestore(updated);
+
+      // If ticket transitioned to Resolved or Closed, send resolution email to employee
+      if (!wasResolved && isNowResolved) {
+        sendTicketResolvedNotification(
+          updated,
+          updated.resolutionNotes,
+          currentUser?.name || updated.assignedAgent
+        ).then(result => {
+          if (result?.success) {
+            console.log(`Resolution email dispatched to employee (${updated.reporterEmail}) for ticket ${updated.ticketNumber}`);
+          }
+        }).catch(err => {
+          console.error('Failed to send resolution email notification to employee:', err);
+        });
+      }
     }
   };
 
   const handleBulkUpdateStatus = (ticketIds: string[], newStatus: TicketStatus) => {
+    const isNowResolved = newStatus === 'Resolved' || newStatus === 'Closed';
+    const nowIso = new Date().toISOString();
+
     setTickets(prev =>
       prev.map(t => {
         if (!ticketIds.includes(t.id)) return t;
+        const wasResolved = t.status === 'Resolved' || t.status === 'Closed';
         const updated: Ticket = {
           ...t,
           status: newStatus,
-          updatedAt: new Date().toISOString(),
+          updatedAt: nowIso,
+          resolvedAt: isNowResolved && !t.resolvedAt ? nowIso : t.resolvedAt,
         };
         saveTicketToFirestore(updated);
+
+        // Send email to employee if transitioning to Resolved
+        if (!wasResolved && isNowResolved) {
+          sendTicketResolvedNotification(
+            updated,
+            updated.resolutionNotes,
+            currentUser?.name || updated.assignedAgent
+          ).catch(err => {
+            console.error(`Failed to send resolution email to employee for ${updated.ticketNumber}:`, err);
+          });
+        }
+
         return updated;
       })
     );
@@ -415,6 +473,11 @@ export default function App() {
   const handleAddKBArticle = (article: KBArticle) => {
     setKBArticles(prev => [article, ...prev]);
     saveKBArticleToFirestore(article);
+  };
+
+  const handleDeleteKBArticle = (id: string) => {
+    setKBArticles(prev => prev.filter(a => a.id !== id));
+    deleteKBArticleFromFirestore(id);
   };
 
   const handleUpvoteKBArticle = (id: string) => {
@@ -492,6 +555,16 @@ export default function App() {
     }
   };
 
+  const handleClearAllTickets = async () => {
+    try {
+      setTickets([]);
+      saveTickets([]);
+      await deleteAllTicketsFromFirestore();
+    } catch (e) {
+      console.error('Failed to clear tickets:', e);
+    }
+  };
+
   const openTicketsCount = tickets.filter(t => t.status !== 'Resolved' && t.status !== 'Closed').length;
 
   // Unauthenticated Gate: Show Login Screen
@@ -558,7 +631,7 @@ export default function App() {
         />
 
         {/* Main View Container */}
-        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-x-hidden relative z-10">
+        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-x-hidden">
           {currentView === 'dashboard' && (
             <ITStaffDashboardView
               tickets={tickets}
@@ -610,6 +683,12 @@ export default function App() {
             <AnalyticsDashboardView
               tickets={tickets}
               onSelectTicket={t => setSelectedTicket(t)}
+              onClearAllTickets={handleClearAllTickets}
+              onExportCSV={() => exportTicketsToCSV(tickets)}
+              onOpenCreateTicket={() => {
+                setCreatePrefill({});
+                setShowCreateModal(true);
+              }}
             />
           )}
 
@@ -661,6 +740,7 @@ export default function App() {
             <KnowledgeBaseView
               articles={kbArticles}
               onAddArticle={handleAddKBArticle}
+              onDeleteArticle={handleDeleteKBArticle}
               onUpvoteArticle={handleUpvoteKBArticle}
             />
           )}

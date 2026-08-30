@@ -45,6 +45,42 @@ export async function sendTicketCreatedNotification(
 }
 
 /**
+ * Dispatches an automated email notification to an employee once their support ticket is resolved
+ * Recipient: The employee who submitted the ticket (ticket.reporterEmail)
+ */
+export async function sendTicketResolvedNotification(
+  ticket: Ticket,
+  resolutionNotes?: string,
+  resolvedBy?: string
+): Promise<NotificationResult | null> {
+  try {
+    const res = await fetch('/api/notifications/ticket-resolved', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ticket,
+        resolutionNotes,
+        resolvedBy,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      console.warn('Failed to send ticket resolution email notification:', errData);
+      return null;
+    }
+
+    const data: NotificationResult = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Error dispatching ticket resolution email notification:', err);
+    return null;
+  }
+}
+
+/**
  * Fetch recent notification dispatch logs
  */
 export async function getRecentNotificationLogs() {

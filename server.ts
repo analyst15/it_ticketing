@@ -565,6 +565,214 @@ Sent to: ${allRecipients.join(", ")}`;
     }
   });
 
+  // Ticket Resolved Email Notification Endpoint
+  // Dispatches an email notification to the reporting employee once their support ticket is marked as resolved
+  app.post("/api/notifications/ticket-resolved", async (req, res) => {
+    try {
+      const { ticket, resolutionNotes, resolvedBy } = req.body;
+
+      if (!ticket || !ticket.ticketNumber || !ticket.title) {
+        return res.status(400).json({ error: "Invalid ticket payload" });
+      }
+
+      const recipientEmail = (ticket.reporterEmail || "").trim().toLowerCase();
+      const primaryAdminEmail = process.env.IT_SUPPORT_EMAIL || "it@elimishawatoto.org";
+
+      // If no valid reporter email, fallback or include admin
+      const allRecipients = recipientEmail && recipientEmail.includes("@")
+        ? [recipientEmail]
+        : [primaryAdminEmail];
+
+      const technicianName = resolvedBy || ticket.assignedAgent || "IT Support Specialist";
+      const notesText = resolutionNotes || ticket.resolutionNotes || "Your issue has been diagnosed, resolved, and verified by our IT Support team.";
+      const subject = `[RESOLVED] Ticket ${ticket.ticketNumber}: ${ticket.title} - IT Helpdesk`;
+      const appUrl = process.env.APP_URL || "https://ais-pre-b75v64w3m4o26ytkwlo4dg-396190362785.europe-west2.run.app";
+
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #1e293b; }
+    .container { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background: #065f46; padding: 24px; color: #ffffff; }
+    .header-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6ee7b7; font-weight: 700; margin-bottom: 4px; }
+    .header-title { font-size: 20px; font-weight: 700; margin: 0; color: #ffffff; }
+    .content { padding: 24px; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .section-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0; }
+    .resolution-box { background: #ecfdf5; border: 1px solid #a7f3d0; border-left: 4px solid #10b981; padding: 14px 16px; margin-top: 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; color: #064e3b; }
+    .label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 2px; }
+    .value { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .btn { display: inline-block; background: #059669; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 18px; }
+    .footer { background: #f1f5f9; padding: 16px 24px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-tag">Elimisha Watoto Foundation • IT Helpdesk</div>
+      <h1 class="header-title">✓ Support Ticket Resolved</h1>
+    </div>
+    <div class="content">
+      <p style="margin-top: 0; font-size: 14px; color: #334155; line-height: 1.5;">
+        Hello <strong>${ticket.reporterName || "Colleague"}</strong>,
+      </p>
+      <p style="font-size: 14px; color: #475569; line-height: 1.5;">
+        Great news! Your support ticket <strong style="color: #0f172a;">${ticket.ticketNumber}</strong> has been completed and marked as <strong>Resolved</strong> by our IT Support team.
+      </p>
+
+      <div class="section-box">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 6px 0; width: 50%;">
+              <div class="label">Ticket ID</div>
+              <div class="value">${ticket.ticketNumber}</div>
+            </td>
+            <td style="padding: 6px 0; width: 50%;">
+              <div class="label">Status</div>
+              <div><span class="status-badge">✓ Resolved</span></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0;">
+              <div class="label">Category</div>
+              <div class="value">${ticket.category || 'General Issue'}</div>
+            </td>
+            <td style="padding: 6px 0;">
+              <div class="label">Resolved By</div>
+              <div class="value">${technicianName}</div>
+            </td>
+          </tr>
+          ${ticket.assetId ? `
+          <tr>
+            <td colspan="2" style="padding: 6px 0;">
+              <div class="label">Device / Asset</div>
+              <div class="value" style="font-weight: 500;">${ticket.assetId}</div>
+            </td>
+          </tr>
+          ` : ''}
+        </table>
+
+        <div style="margin-top: 12px;">
+          <div class="label">Original Request</div>
+          <div class="value" style="font-size: 14px; color: #1e293b;">${ticket.title}</div>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div class="label" style="color: #047857;">Resolution Summary & Actions Taken</div>
+          <div class="resolution-box">${notesText.replace(/\n/g, '<br/>')}</div>
+        </div>
+      </div>
+
+      <div style="background: #f0fdf4; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #166534; line-height: 1.5; border: 1px dashed #86efac;">
+        <strong>Need further assistance?</strong> If you continue to experience any issues, you can reply directly to this email or reopen the request in your Employee Support Portal.
+      </div>
+
+      <div style="text-align: center; margin-top: 20px;">
+        <a href="${appUrl}?portal=employee" class="btn" style="color: #ffffff;">View Ticket in Employee Portal</a>
+      </div>
+    </div>
+    <div class="footer">
+      Sent to <strong>${recipientEmail || 'your staff account'}</strong>.<br/>
+      Elimisha Watoto Foundation • IT Service Desk • <strong>it@elimishawatoto.org</strong>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const textFallback = `[TICKET RESOLVED: ${ticket.ticketNumber}]
+Hello ${ticket.reporterName || "Colleague"},
+
+Your support request "${ticket.title}" (${ticket.ticketNumber}) has been marked as RESOLVED by ${technicianName}.
+
+Category: ${ticket.category}
+Resolution Notes:
+${notesText}
+
+If you continue to experience problems, you can reopen this ticket or contact IT Support at ${primaryAdminEmail}.
+
+View in Portal: ${appUrl}?portal=employee
+Elimisha Watoto Foundation IT Helpdesk`;
+
+      let sendStatus: 'sent' | 'simulated' = 'simulated';
+      let messageId: string | undefined = undefined;
+      let smtpError: string | undefined = undefined;
+
+      const smtpConfig = getSmtpConfig();
+
+      if (smtpConfig.configured) {
+        try {
+          const transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 465,
+            secure: true,
+            auth: {
+              user: smtpConfig.user,
+              pass: smtpConfig.pass,
+            },
+            tls: {
+              rejectUnauthorized: false,
+            },
+          });
+
+          const info = await transporter.sendMail({
+            from: smtpConfig.from,
+            to: allRecipients,
+            subject,
+            text: textFallback,
+            html: htmlContent,
+          });
+
+          sendStatus = 'sent';
+          messageId = info.messageId;
+          console.log(`[GOOGLE WORKSPACE RESOLUTION EMAIL SENT] Ticket ${ticket.ticketNumber} to employee: ${allRecipients.join(", ")} | ID: ${info.messageId}`);
+        } catch (err: any) {
+          smtpError = err?.message || String(err);
+          console.error(`[SMTP ERROR] Failed to send resolution email via Google Workspace / SMTP:`, smtpError);
+          sendStatus = 'simulated';
+        }
+      } else {
+        console.log(`[RESOLUTION EMAIL DISPATCHED] (Simulated / Logged for Employee: ${recipientEmail})`);
+        console.log(`To: ${allRecipients.join(", ")}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`Ticket: ${ticket.ticketNumber} - ${ticket.title}`);
+        console.log(`Resolution: ${notesText}`);
+      }
+
+      // Record in notification logs
+      const logEntry = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        ticketNumber: ticket.ticketNumber,
+        recipients: allRecipients,
+        subject,
+        timestamp: new Date().toISOString(),
+        status: sendStatus,
+        error: smtpError,
+        preview: `Ticket ${ticket.ticketNumber} resolved for employee ${ticket.reporterName} (${ticket.reporterEmail})`,
+      };
+      emailNotificationLogs.unshift(logEntry);
+      if (emailNotificationLogs.length > 50) emailNotificationLogs.pop();
+
+      return res.json({
+        success: true,
+        message: sendStatus === 'sent'
+          ? `Resolution email successfully sent to ${allRecipients.join(", ")}.`
+          : `Resolution email logged (Simulated mode for ${allRecipients.join(", ")}).`,
+        recipients: allRecipients,
+        ticketNumber: ticket.ticketNumber,
+        status: sendStatus,
+        messageId,
+        error: smtpError,
+        dispatchedAt: logEntry.timestamp,
+      });
+    } catch (err: any) {
+      console.error("Ticket resolution email error:", err);
+      return res.status(500).json({ error: err.message || "Failed to dispatch resolution email" });
+    }
+  });
+
 
   // Get recent notification dispatch log
   app.get("/api/notifications/recent", (_req, res) => {

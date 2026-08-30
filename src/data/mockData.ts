@@ -27,7 +27,7 @@ export const INITIAL_USERS: UserAccount[] = [
     email: 'grace.wanjiku@elimishawatoto.org',
     password: 'password123',
     role: 'Employee',
-    department: 'Human Resources',
+    department: 'Human Resource',
     status: 'Active',
     dateAdded: '1/20/2026',
   },
@@ -70,16 +70,6 @@ export const INITIAL_USERS: UserAccount[] = [
     department: 'Monitoring & Evaluation',
     status: 'Active',
     dateAdded: '2/12/2026',
-  },
-  {
-    id: 'usr-8',
-    name: 'Peter Kariuki',
-    email: 'peter.kariuki@elimishawatoto.org',
-    password: 'staff123',
-    role: 'IT Staff',
-    department: 'IT Support',
-    status: 'Active',
-    dateAdded: '1/10/2026',
   },
   {
     id: 'usr-admin',
@@ -145,7 +135,7 @@ export const INITIAL_ASSETS: ITAsset[] = [
     safaricomPhoneNumber: '+254 720 998 877',
     airtelPhoneNumber: '+254 780 112 233',
     phoneConditionComments: 'Good working condition.',
-    department: 'Human Resources',
+    department: 'Human Resource',
     dateAdded: '1/20/2026',
   },
   {
@@ -232,7 +222,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     priority: 'High',
     status: 'In Progress',
     tier: 'Tier 2 (SysAdmin)',
-    assignedAgent: 'Peter Kariuki',
+    assignedAgent: 'IT Support Admin',
     assignedTeam: 'IT Support',
     reporterName: 'Sarah Mwangi',
     reporterEmail: 'sarah.mwangi@elimishawatoto.org',
@@ -254,8 +244,8 @@ export const INITIAL_TICKETS: Ticket[] = [
       },
       {
         id: 'c-2',
-        authorName: 'Peter Kariuki',
-        authorEmail: 'peter.kariuki@elimishawatoto.org',
+        authorName: 'IT Support Admin',
+        authorEmail: 'it@elimishawatoto.org',
         authorRole: 'Agent',
         type: 'Internal Note',
         content: 'Checking VPN gateway logs for timeout renegotiations. Preparing a configuration profile update.',
@@ -318,11 +308,11 @@ export const INITIAL_TICKETS: Ticket[] = [
     priority: 'Medium',
     status: 'In Progress',
     tier: 'Tier 1 (Helpdesk)',
-    assignedAgent: 'Peter Kariuki',
+    assignedAgent: 'IT Support Admin',
     assignedTeam: 'IT Support',
     reporterName: 'Grace Wanjiku',
     reporterEmail: 'grace.wanjiku@elimishawatoto.org',
-    reporterDepartment: 'Human Resources',
+    reporterDepartment: 'Human Resource',
     assetId: 'PF-2K90LM',
     operatingSystem: 'Windows 11 Pro',
     tags: ['MFA', 'Password', 'M365', 'Security'],
@@ -331,8 +321,8 @@ export const INITIAL_TICKETS: Ticket[] = [
     comments: [
       {
         id: 'c-4',
-        authorName: 'Peter Kariuki',
-        authorEmail: 'peter.kariuki@elimishawatoto.org',
+        authorName: 'IT Support Admin',
+        authorEmail: 'it@elimishawatoto.org',
         authorRole: 'Agent',
         type: 'Internal Note',
         content: 'Identity verified with HR director. Generating temporary access pass (TAP) in Entra ID.',
@@ -384,7 +374,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     priority: 'Low',
     status: 'Resolved',
     tier: 'Field Support',
-    assignedAgent: 'Peter Kariuki',
+    assignedAgent: 'IT Support Admin',
     assignedTeam: 'IT Support',
     reporterName: 'Brian Mutua',
     reporterEmail: 'brian.mutua@elimishawatoto.org',
@@ -399,8 +389,8 @@ export const INITIAL_TICKETS: Ticket[] = [
     comments: [
       {
         id: 'c-5',
-        authorName: 'Peter Kariuki',
-        authorEmail: 'peter.kariuki@elimishawatoto.org',
+        authorName: 'IT Support Admin',
+        authorEmail: 'it@elimishawatoto.org',
         authorRole: 'Agent',
         type: 'Public Reply',
         content: 'Inspected printer physically, removed folded sheet from feed rollers, and power cycled. Test print succeeded.',
@@ -481,7 +471,6 @@ export const INITIAL_KB_ARTICLES: KBArticle[] = [
 ];
 
 export const IT_AGENTS = [
-  { name: 'Peter Kariuki', role: 'IT Support Engineer', team: 'IT Support', email: 'peter.kariuki@elimishawatoto.org' },
   { name: 'IT Support Admin', role: 'System Administrator', team: 'IT Support', email: 'it@elimishawatoto.org' },
 ];
 

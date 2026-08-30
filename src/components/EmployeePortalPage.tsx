@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Ticket,
   TicketCategory,
@@ -9,6 +9,7 @@ import {
   UserAccount,
   TicketComment,
   EmployeeNotification,
+  ORGANIZATIONAL_DEPARTMENTS,
 } from '../types';
 import { StatusBadge, PriorityBadge, CategoryBadge } from './Badges';
 import { formatTimeAgo } from '../utils/time';
@@ -31,7 +32,6 @@ import {
   Check,
   Copy,
   HelpCircle,
-  ThumbsUp,
   Lightbulb,
   Globe,
   LogOut,
@@ -41,6 +41,7 @@ import {
   CheckCheck,
   MessageSquare,
   AlertCircle,
+  ChevronLeft,
   ChevronRight,
   Inbox,
   LifeBuoy,
@@ -52,6 +53,10 @@ import {
   AtSign,
   Send,
   PhoneCall,
+  ThumbsUp,
+  BookOpen,
+  Eye,
+  ArrowRight,
 } from 'lucide-react';
 
 interface EmployeePortalPageProps {
@@ -246,10 +251,9 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   // Selected Ticket for Modal View
   const [selectedTicketForModal, setSelectedTicketForModal] = useState<Ticket | null>(null);
 
-  // Search States
-  const [globalSearch, setGlobalSearch] = useState('');
-  const [ticketFilterStatus, setTicketFilterStatus] = useState<string>('All');
-  const [kbCategoryFilter, setKbCategoryFilter] = useState<string>('All');
+  // Selected Knowledge Base Article for Modal View
+  const [selectedArticleForModal, setSelectedArticleForModal] = useState<KBArticle | null>(null);
+  const [copiedStepIdx, setCopiedStepIdx] = useState<number | null>(null);
 
   // Request Form State (When user clicks "+ New Support Request")
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -259,6 +263,30 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   const [formPriority, setFormPriority] = useState<TicketPriority>('Medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState<string | null>(null);
+
+  // Search States
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [ticketFilterStatus, setTicketFilterStatus] = useState<string>('All');
+  const [kbCategoryFilter, setKbCategoryFilter] = useState<string>('All');
+
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedArticleForModal) setSelectedArticleForModal(null);
+        else if (selectedTicketForModal) setSelectedTicketForModal(null);
+        else if (showRequestForm) setShowRequestForm(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedArticleForModal, selectedTicketForModal, showRequestForm]);
+
+  const handleCopyStep = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedStepIdx(idx);
+    setTimeout(() => setCopiedStepIdx(null), 2000);
+  };
 
   // AI Triage hint for employee
   const [isTriaging, setIsTriaging] = useState(false);
@@ -449,6 +477,14 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   const [staffSearchTerm, setStaffSearchTerm] = useState('');
   const [staffDeptFilter, setStaffDeptFilter] = useState('All');
   const [copiedStaffEmail, setCopiedStaffEmail] = useState<string | null>(null);
+  const staffFilterScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollStaffFilters = (direction: 'left' | 'right') => {
+    if (staffFilterScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      staffFilterScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   const handleCopyStaffEmail = (email: string) => {
     navigator.clipboard.writeText(email);
@@ -457,11 +493,13 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
   };
 
   const staffDepartments = useMemo(() => {
-    const depts = new Set<string>();
+    const depts = new Set<string>(['All', ...ORGANIZATIONAL_DEPARTMENTS]);
     users.forEach((u) => {
-      if (u.department) depts.add(u.department);
+      if (u.department && u.department.trim()) {
+        depts.add(u.department.trim());
+      }
     });
-    return ['All', ...Array.from(depts)];
+    return Array.from(depts);
   }, [users]);
 
   const filteredStaff = useMemo(() => {
@@ -588,18 +626,18 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
       {/* Top Navbar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between gap-4">
           {/* Brand Logo & Title */}
           <div className="flex items-center gap-4">
-            <div id="navbar-brand-logo" className="flex items-center gap-3">
+            <div id="navbar-brand-logo" className="flex items-center gap-3.5">
               <img
                 src="https://firebasestorage.googleapis.com/v0/b/ilearn-cc226.firebasestorage.app/o/EWF%20Main.png?alt=media&token=3e05f629-7f10-44ba-a0a9-e901a63010c8"
                 alt="EWF Logo"
-                className="h-9 sm:h-11 max-h-11 w-auto object-contain"
+                className="h-12 sm:h-14 md:h-16 max-h-16 w-auto object-contain drop-shadow-2xs transition-all"
                 referrerPolicy="no-referrer"
               />
-              <div className="h-5 w-px bg-slate-200 hidden sm:block" />
-              <span className="text-sm sm:text-base font-normal text-slate-900 tracking-tight hidden sm:block">
+              <div className="h-7 w-px bg-slate-200 hidden sm:block" />
+              <span className="text-sm sm:text-base font-medium text-slate-900 tracking-tight hidden sm:block">
                 Staff Support Portal
               </span>
             </div>
@@ -1388,29 +1426,57 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               </div>
             </div>
 
-            {/* Department Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              {staffDepartments.map((dept) => {
-                const count = dept === 'All' ? users.length : users.filter(u => u.department === dept).length;
-                return (
-                  <button
-                    key={dept}
-                    onClick={() => setStaffDeptFilter(dept)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                      staffDeptFilter === dept
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'
-                    }`}
-                  >
-                    <span>{dept}</span>
-                    <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
-                      staffDeptFilter === dept ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Department Filter Pills with Horizontal Scroll & Navigation Controls */}
+            <div className="relative flex items-center gap-1.5 bg-slate-50/80 p-1.5 rounded-2xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => scrollStaffFilters('left')}
+                className="hidden sm:flex p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200 shadow-2xs transition-all shrink-0 cursor-pointer"
+                title="Scroll departments left"
+                aria-label="Scroll departments left"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div
+                ref={staffFilterScrollRef}
+                className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400 w-full"
+                style={{ scrollbarWidth: 'thin' }}
+              >
+                {staffDepartments.map((dept) => {
+                  const count = dept === 'All' ? users.length : users.filter(u => u.department === dept).length;
+                  return (
+                    <button
+                      key={dept}
+                      onClick={() => setStaffDeptFilter(dept)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                        staffDeptFilter === dept
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs'
+                      }`}
+                    >
+                      <span>{dept}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                          staffDeptFilter === dept ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => scrollStaffFilters('right')}
+                className="hidden sm:flex p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200 shadow-2xs transition-all shrink-0 cursor-pointer"
+                title="Scroll departments right"
+                aria-label="Scroll departments right"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Staff Grid */}
@@ -1460,18 +1526,6 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
                             </div>
                           </div>
                         </div>
-
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase border ${
-                            user.role === 'Admin'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : user.role === 'IT Staff'
-                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
-                        >
-                          {user.role}
-                        </span>
                       </div>
 
                       {/* Email container box */}
@@ -1556,10 +1610,12 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <HelpCircle className="w-5 h-5 text-blue-600" />
+                  <BookOpen className="w-5 h-5 text-blue-600" />
                   Self-Help Knowledge Base & Guides
                 </h2>
-                <p className="text-xs text-slate-500">Step-by-step troubleshooting articles for common IT issues</p>
+                <p className="text-xs text-slate-500">
+                  Step-by-step troubleshooting articles and official IT procedures. Click any guide to view full instructions.
+                </p>
               </div>
 
               {/* Category Filter */}
@@ -1580,51 +1636,108 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {kbArticles
-                .filter((a) => (kbCategoryFilter === 'All' ? true : a.category === kbCategoryFilter))
-                .map((article) => (
-                  <div
-                    key={article.id}
-                    className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3 flex flex-col justify-between hover:border-blue-300 transition-all"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <CategoryBadge category={article.category} />
-                        <span className="text-[11px] text-slate-400">{formatTimeAgo(article.createdAt)}</span>
-                      </div>
-                      <h3 className="font-bold text-sm text-slate-900">{article.title}</h3>
-                      <p className="text-xs text-slate-600 leading-relaxed">{article.summary}</p>
+            {/* Articles Grid */}
+            {(() => {
+              const filteredArticles = kbArticles.filter((a) => {
+                const matchesCategory = kbCategoryFilter === 'All' ? true : a.category === kbCategoryFilter;
+                const query = globalSearch.trim().toLowerCase();
+                const matchesSearch = query
+                  ? a.title.toLowerCase().includes(query) ||
+                    a.summary.toLowerCase().includes(query) ||
+                    (a.keywords && a.keywords.some((k) => k.toLowerCase().includes(query))) ||
+                    (a.symptoms && a.symptoms.some((s) => s.toLowerCase().includes(query)))
+                  : true;
+                return matchesCategory && matchesSearch;
+              });
 
-                      {/* Resolution Steps Preview */}
-                      <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                          Key Steps:
-                        </span>
-                        <ul className="text-xs text-slate-700 space-y-0.5 list-disc list-inside">
-                          {article.resolutionSteps.slice(0, 3).map((step, idx) => (
-                            <li key={idx} className="line-clamp-1">
-                              {step}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              if (filteredArticles.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-400 space-y-3">
+                    <BookOpen className="w-10 h-10 mx-auto text-slate-300" />
+                    <p className="text-sm font-semibold text-slate-700">No matching self-help guides found</p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      Try adjusting your category filter or search keywords, or submit a support request directly to our IT desk.
+                    </p>
+                    <div className="pt-2 flex items-center justify-center gap-2">
                       <button
-                        onClick={() => onUpvoteKBArticle && onUpvoteKBArticle(article.id)}
-                        className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
+                        type="button"
+                        onClick={() => {
+                          setKbCategoryFilter('All');
+                          setGlobalSearch('');
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
                       >
-                        <ThumbsUp className="w-3.5 h-3.5" />
-                        <span>Helpful ({article.helpfulVotes})</span>
+                        Reset Filters
                       </button>
-
-                      <span className="text-[11px] text-slate-400">{article.views} views</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowRequestForm(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                      >
+                        Submit Support Ticket
+                      </button>
                     </div>
                   </div>
-                ))}
-            </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredArticles.map((article) => (
+                    <div
+                      key={article.id}
+                      id={`emp-kb-article-${article.id}`}
+                      onClick={() => setSelectedArticleForModal(article)}
+                      className="bg-white border border-slate-200 hover:border-blue-400 hover:shadow-md rounded-2xl p-5 shadow-xs space-y-3 flex flex-col justify-between cursor-pointer transition-all group"
+                      title="Click to read full troubleshooting guide"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <CategoryBadge category={article.category} />
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Eye className="w-3 h-3 text-slate-400" />
+                              {article.views} views
+                            </span>
+                            <span>•</span>
+                            <span>{formatTimeAgo(article.createdAt)}</span>
+                          </div>
+                        </div>
+
+                        <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                          {article.title}
+                        </h3>
+                        <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{article.summary}</p>
+
+                        {/* Resolution Steps Preview */}
+                        <div className="p-3 bg-slate-50 rounded-xl space-y-1 border border-slate-100 group-hover:bg-blue-50/50 transition-colors">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                            Key Resolution Steps ({article.resolutionSteps.length}):
+                          </span>
+                          <ul className="text-xs text-slate-700 space-y-0.5 list-disc list-inside">
+                            {article.resolutionSteps.slice(0, 3).map((step, idx) => (
+                              <li key={idx} className="line-clamp-1">
+                                {step}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Card Footer */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-[11px] text-slate-400">
+                          Authored by <strong className="text-slate-600">{article.author}</strong>
+                        </span>
+                        <span className="text-blue-600 font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform text-xs">
+                          Read full guide <ArrowRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1866,6 +1979,185 @@ export const EmployeePortalPage: React.FC<EmployeePortalPageProps> = ({
           onClose={() => setSelectedTicketForModal(null)}
           onAddComment={onAddComment}
         />
+      )}
+
+      {/* Employee Knowledge Base Article Reader Modal */}
+      {selectedArticleForModal && (
+        <div
+          id="emp-kb-article-reader-backdrop"
+          className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedArticleForModal(null);
+          }}
+        >
+          <div
+            id="emp-kb-article-reader-modal"
+            className="bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 my-auto relative z-[101]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Bar - Sticky & Pinned */}
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-20">
+              <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                <CategoryBadge category={selectedArticleForModal.category} />
+                <span className="text-xs text-slate-500 font-medium truncate">
+                  Authored by <strong className="text-slate-700">{selectedArticleForModal.author}</strong>
+                </span>
+                <span className="text-xs text-slate-400">• {formatTimeAgo(selectedArticleForModal.createdAt)}</span>
+              </div>
+              <button
+                id="close-emp-kb-article-btn"
+                type="button"
+                onClick={() => setSelectedArticleForModal(null)}
+                className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 hover:border-slate-300 cursor-pointer transition-all shrink-0 flex items-center justify-center shadow-2xs"
+                title="Close article (Esc)"
+                aria-label="Close article dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Article Content - Smooth Internal Scroll */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 text-xs min-h-0">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-2 leading-snug">
+                  {selectedArticleForModal.title}
+                </h2>
+                <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  {selectedArticleForModal.summary}
+                </p>
+              </div>
+
+              {/* Symptoms */}
+              {selectedArticleForModal.symptoms && selectedArticleForModal.symptoms.length > 0 && (
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                    Observed Symptoms & Indicators:
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedArticleForModal.symptoms.map((symptom, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px]"
+                      >
+                        {symptom}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Root Cause Analysis */}
+              {selectedArticleForModal.rootCause && (
+                <div className="space-y-1 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <h4 className="font-bold text-slate-700">Root Cause / Technical Context:</h4>
+                  <p className="text-slate-600 leading-relaxed">{selectedArticleForModal.rootCause}</p>
+                </div>
+              )}
+
+              {/* Step-by-Step Resolution Steps */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Step-by-Step Resolution Procedure:
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    {selectedArticleForModal.resolutionSteps.length} step(s)
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedArticleForModal.resolutionSteps.map((step, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 flex items-start justify-between gap-3 text-slate-800 transition-colors"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed">{step}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyStep(step, idx)}
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                        title="Copy step to clipboard"
+                        aria-label="Copy step"
+                      >
+                        {copiedStepIdx === idx ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Prevention / Best Practices */}
+              {selectedArticleForModal.prevention && (
+                <div className="space-y-1 bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200/80 text-emerald-950">
+                  <h4 className="font-bold text-emerald-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                    Prevention & Best Practices:
+                  </h4>
+                  <p className="leading-relaxed text-[11px] text-emerald-900/90">
+                    {selectedArticleForModal.prevention}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Sticky Bottom Footer */}
+            <div className="p-3.5 sm:px-6 sm:py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs shrink-0 sticky bottom-0 z-20">
+              <span className="text-slate-500 text-center sm:text-left">
+                Did this guide resolve your issue?
+              </span>
+              <div className="flex items-center justify-end gap-2.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const article = selectedArticleForModal;
+                    setSelectedArticleForModal(null);
+                    setFormCategory(article.category);
+                    setFormTitle(`Follow-up assistance regarding: ${article.title}`);
+                    setFormDescription(`I followed the guide "${article.title}" but I am still having trouble.`);
+                    setFormPriority('Medium');
+                    setShowRequestForm(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 cursor-pointer transition-all"
+                >
+                  Still stuck? Submit Ticket
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onUpvoteKBArticle) {
+                      onUpvoteKBArticle(selectedArticleForModal.id);
+                    }
+                    setSelectedArticleForModal((prev) =>
+                      prev ? { ...prev, helpfulVotes: (prev.helpfulVotes || 0) + 1 } : null
+                    );
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs transition-all cursor-pointer"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                  <span>Helpful ({selectedArticleForModal.helpfulVotes || 0})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedArticleForModal(null)}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-200 border border-slate-200 cursor-pointer transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

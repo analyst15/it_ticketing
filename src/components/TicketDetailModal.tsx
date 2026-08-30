@@ -795,8 +795,15 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             </div>
 
             <p className="text-xs text-slate-600">
-              Provide resolution notes explaining the fix. This will be visible to the user and recorded in the audit trail.
+              Provide resolution notes explaining the fix. This will be recorded in the audit trail and emailed directly to the employee.
             </p>
+
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+              <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                An automated resolution email will be dispatched to <strong>{ticket.reporterEmail || ticket.reporterName}</strong>.
+              </span>
+            </div>
 
             <textarea
               rows={4}

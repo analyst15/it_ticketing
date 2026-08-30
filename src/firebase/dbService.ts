@@ -329,7 +329,7 @@ export function subscribeUsers(
               name: 'Elimisha IT Administrator',
               email: 'it@elimishawatoto.org',
               role: 'Admin',
-              department: 'IT & Systems',
+              department: 'IT',
               status: 'Active',
               dateAdded: '1/15/2026',
               password: 'ITEWF@2026',
@@ -347,7 +347,7 @@ export function subscribeUsers(
             name: 'Elimisha IT Administrator',
             email: 'it@elimishawatoto.org',
             role: 'Admin',
-            department: 'IT & Systems',
+            department: 'IT',
             status: 'Active',
             dateAdded: '1/15/2026',
             password: 'ITEWF@2026',
@@ -463,5 +463,15 @@ export async function saveKBArticleToFirestore(article: KBArticle): Promise<void
     await setDoc(docRef, article, { merge: true });
   } catch (err) {
     console.error('Error saving KB article to Firestore:', err);
+  }
+}
+
+export async function deleteKBArticleFromFirestore(articleId: string): Promise<void> {
+  try {
+    await ensureFirebaseAuth();
+    const docRef = doc(db, KB_COLLECTION, articleId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error('Error deleting KB article from Firestore:', err);
   }
 }

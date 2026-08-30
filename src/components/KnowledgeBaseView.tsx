@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KBArticle, TicketCategory, Ticket } from '../types';
 import { CategoryBadge } from './Badges';
 import {
@@ -16,24 +16,52 @@ import {
   X,
   User,
   Clock,
+  Trash2,
 } from 'lucide-react';
 
 interface KnowledgeBaseViewProps {
   articles: KBArticle[];
   onAddArticle: (article: KBArticle) => void;
+  onDeleteArticle?: (id: string) => void;
   onUpvoteArticle: (id: string) => void;
 }
 
 export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
   articles,
   onAddArticle,
+  onDeleteArticle,
   onUpvoteArticle,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedArticle, setSelectedArticle] = useState<KBArticle | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [articleToDelete, setArticleToDelete] = useState<KBArticle | null>(null);
   const [copiedStepIdx, setCopiedStepIdx] = useState<number | null>(null);
+
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (articleToDelete) setArticleToDelete(null);
+        else if (selectedArticle) setSelectedArticle(null);
+        else if (showCreateModal) setShowCreateModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedArticle, showCreateModal, articleToDelete]);
+
+  const confirmDelete = () => {
+    if (!articleToDelete) return;
+    if (onDeleteArticle) {
+      onDeleteArticle(articleToDelete.id);
+    }
+    if (selectedArticle?.id === articleToDelete.id) {
+      setSelectedArticle(null);
+    }
+    setArticleToDelete(null);
+  };
 
   // New Article Form state
   const [newTitle, setNewTitle] = useState('');
@@ -159,15 +187,29 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
           <div
             key={article.id}
             onClick={() => setSelectedArticle(article)}
-            className="bg-white hover:border-blue-300 hover:shadow-md border border-slate-200/90 rounded-xl p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all group space-y-3"
+            className="bg-white hover:border-blue-300 hover:shadow-md border border-slate-200/90 rounded-xl p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all group space-y-3 relative"
           >
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <CategoryBadge category={article.category} />
-                <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                  <Eye className="w-3 h-3 text-slate-400" />
-                  {article.views} views
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                    <Eye className="w-3 h-3 text-slate-400" />
+                    {article.views}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setArticleToDelete(article);
+                    }}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 cursor-pointer transition-all opacity-70 group-hover:opacity-100"
+                    title="Delete article"
+                    aria-label={`Delete ${article.title}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
@@ -212,26 +254,55 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
 
       {/* Article Detail Reader Modal */}
       {selectedArticle && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white text-slate-800 border border-slate-200 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Top Bar */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-wrap">
+        <div
+          id="kb-article-reader-backdrop"
+          className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedArticle(null);
+          }}
+        >
+          <div
+            id="kb-article-reader-modal"
+            className="bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 my-auto relative z-[101]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Bar - Guaranteed Visible & Sticky */}
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-20">
+              <div className="flex items-center gap-2.5 flex-wrap min-w-0">
                 <CategoryBadge category={selectedArticle.category} />
-                <span className="text-xs text-slate-500">Authored by {selectedArticle.author}</span>
+                <span className="text-xs text-slate-500 font-medium truncate">
+                  Authored by <strong className="text-slate-700">{selectedArticle.author}</strong>
+                </span>
               </div>
-              <button
-                onClick={() => setSelectedArticle(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  id="delete-kb-article-btn"
+                  type="button"
+                  onClick={() => setArticleToDelete(selectedArticle)}
+                  className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer transition-all shrink-0 flex items-center gap-1.5 shadow-2xs text-xs font-semibold"
+                  title="Delete article"
+                  aria-label="Delete article"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span className="hidden sm:inline">Delete</span>
+                </button>
+                <button
+                  id="close-kb-article-btn"
+                  type="button"
+                  onClick={() => setSelectedArticle(null)}
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 hover:border-slate-300 cursor-pointer transition-all shrink-0 flex items-center justify-center shadow-2xs"
+                  title="Close article (Esc)"
+                  aria-label="Close article dialog"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Article Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+            {/* Article Content - Smooth Internal Scroll */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 text-xs min-h-0">
               <div>
-                <h2 className="text-lg font-bold text-slate-900 mb-2 leading-snug">{selectedArticle.title}</h2>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 mb-2 leading-snug">{selectedArticle.title}</h2>
                 <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   {selectedArticle.summary}
                 </p>
@@ -281,6 +352,7 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                     >
                       <span>{step}</span>
                       <button
+                        type="button"
                         onClick={() => handleCopyStep(step, idx)}
                         className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800 shrink-0 cursor-pointer transition-colors shadow-2xs"
                         title="Copy step"
@@ -305,18 +377,93 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
               )}
             </div>
 
-            {/* Footer with Upvoting */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
-              <span className="text-slate-500">Was this article helpful to your investigation?</span>
+            {/* Sticky Bottom Footer */}
+            <div className="p-3.5 sm:px-6 sm:py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs shrink-0 sticky bottom-0 z-20">
+              <span className="text-slate-500 text-center sm:text-left">Was this article helpful to your investigation?</span>
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setArticleToDelete(selectedArticle)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 hover:border-rose-200 border border-transparent cursor-pointer transition-all flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedArticle(null)}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-200 border border-slate-200 cursor-pointer transition-all"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpvoteArticle(selectedArticle.id);
+                    setSelectedArticle(prev => (prev ? { ...prev, helpfulVotes: prev.helpfulVotes + 1 } : null));
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs transition-all cursor-pointer"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                  <span>Yes, this resolved my issue ({selectedArticle.helpfulVotes})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {articleToDelete && (
+        <div
+          id="kb-delete-confirm-backdrop"
+          className="fixed inset-0 z-[120] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150"
+          onClick={() => setArticleToDelete(null)}
+        >
+          <div
+            id="kb-delete-confirm-modal"
+            className="bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150 my-auto relative z-[121]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Delete Knowledge Article</h3>
+                <p className="text-xs text-slate-500">This action is permanent and cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+              <p className="font-bold text-slate-900 line-clamp-2">{articleToDelete.title}</p>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 pt-1">
+                <span>Category: <strong className="text-slate-700">{articleToDelete.category}</strong></span>
+                <span>•</span>
+                <span>By {articleToDelete.author}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to delete this article? It will no longer appear in the IT Knowledge Base or employee self-service search.
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
               <button
-                onClick={() => {
-                  onUpvoteArticle(selectedArticle.id);
-                  setSelectedArticle(prev => (prev ? { ...prev, helpfulVotes: prev.helpfulVotes + 1 } : null));
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs transition-all cursor-pointer"
+                type="button"
+                onClick={() => setArticleToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 cursor-pointer transition-all"
               >
-                <ThumbsUp className="w-3.5 h-3.5" />
-                Yes, this resolved my issue ({selectedArticle.helpfulVotes})
+                Cancel
+              </button>
+              <button
+                id="confirm-delete-article-btn"
+                type="button"
+                onClick={confirmDelete}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer transition-all"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Yes, Delete Article
               </button>
             </div>
           </div>
@@ -325,17 +472,36 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
 
       {/* Create Article Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white text-slate-800 border border-slate-200 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in">
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+        <div
+          id="kb-article-create-backdrop"
+          className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCreateModal(false);
+          }}
+        >
+          <div
+            id="kb-article-create-modal"
+            className="bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 my-auto relative z-[101]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 sticky top-0 z-20">
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-blue-600" />
                 Publish Standard Operating Procedure / KB Article
               </h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">✕</button>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-200 border border-slate-200 cursor-pointer transition-all shadow-2xs"
+                title="Close modal (Esc)"
+                aria-label="Close dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleCreateArticleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+            <form onSubmit={handleCreateArticleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs min-h-0">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Article Title</label>
                 <input
@@ -422,7 +588,7 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}

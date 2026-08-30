@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ITAsset, Ticket, UserAccount } from '../types';
+import { ITAsset, Ticket, UserAccount, ORGANIZATIONAL_DEPARTMENTS } from '../types';
 import {
   Laptop,
   Smartphone,
@@ -36,6 +36,53 @@ interface AssetDirectoryViewProps {
   onDeleteAsset?: (assetId: string) => void;
   onOpenCreateTicketForAsset?: (assetTag: string) => void;
 }
+
+// Helpers for KES currency and Kenyan +254 phone number formatting
+export const formatKESCurrency = (val: string): string => {
+  if (!val || !val.trim()) return '';
+  const trimmed = val.trim();
+  if (trimmed === 'KES' || trimmed === 'KSh' || trimmed === 'KES ' || trimmed === 'KSh ') return 'KES ';
+  const numPart = trimmed.replace(/^(KES|KSh|ksh|kes|\$|USD)?\s*/i, '').trim();
+  if (!numPart) return 'KES ';
+  return `KES ${numPart}`;
+};
+
+export const cleanKESForSaving = (val: string): string => {
+  const trimmed = (val || '').trim();
+  if (!trimmed || trimmed === 'KES' || trimmed === 'KSh' || trimmed === 'KES ' || trimmed === 'KSh ') return '';
+  return formatKESCurrency(trimmed);
+};
+
+export const formatKenyanPhone = (val: string): string => {
+  if (!val || !val.trim()) return '';
+  const trimmed = val.trim();
+  if (trimmed === '+' || trimmed === '+254' || trimmed === '+254 ') return '+254 ';
+  
+  // If starts with 07xx or 01xx
+  if (/^0[17]\d*/.test(trimmed)) {
+    return `+254 ${trimmed.slice(1)}`;
+  }
+  // If starts with 254
+  if (/^254\d*/.test(trimmed)) {
+    return `+${trimmed.slice(0, 3)} ${trimmed.slice(3)}`;
+  }
+  // If already starts with +254
+  if (trimmed.startsWith('+254')) {
+    const rest = trimmed.slice(4).trim();
+    return rest ? `+254 ${rest}` : '+254 ';
+  }
+  // If starts with 7 or 1
+  if (/^[17]\d*/.test(trimmed)) {
+    return `+254 ${trimmed}`;
+  }
+  return `+254 ${trimmed.replace(/^\+?\d{0,3}\s*/, '')}`;
+};
+
+export const cleanPhoneForSaving = (val: string): string => {
+  const trimmed = (val || '').trim();
+  if (!trimmed || trimmed === '+' || trimmed === '+254' || trimmed === '+254 ') return '';
+  return formatKenyanPhone(trimmed);
+};
 
 export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
   assets,
@@ -175,18 +222,18 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
     setEditingAsset(null);
     setFormData({
       employeeName: '',
-      department: 'Engineering',
+      department: 'Secondary',
       laptopModel: '',
-      laptopPrice: '',
+      laptopPrice: 'KES ',
       laptopSerialNumber: '',
       laptopConditionComments: '',
       issuedWithMouse: 'Yes',
       issuedWithTripod: 'No',
       issuedWithMic: 'No',
       phoneModel: '',
-      phonePrice: '',
-      safaricomPhoneNumber: '',
-      airtelPhoneNumber: '',
+      phonePrice: 'KES ',
+      safaricomPhoneNumber: '+254 ',
+      airtelPhoneNumber: '+254 ',
       phoneConditionComments: '',
     });
     setFormError('');
@@ -199,16 +246,16 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
       employeeName: asset.employeeName,
       department: asset.department || '',
       laptopModel: asset.laptopModel,
-      laptopPrice: asset.laptopPrice,
+      laptopPrice: asset.laptopPrice ? formatKESCurrency(asset.laptopPrice) : 'KES ',
       laptopSerialNumber: asset.laptopSerialNumber,
       laptopConditionComments: asset.laptopConditionComments,
       issuedWithMouse: asset.issuedWithMouse,
       issuedWithTripod: asset.issuedWithTripod,
       issuedWithMic: asset.issuedWithMic,
       phoneModel: asset.phoneModel,
-      phonePrice: asset.phonePrice,
-      safaricomPhoneNumber: asset.safaricomPhoneNumber,
-      airtelPhoneNumber: asset.airtelPhoneNumber,
+      phonePrice: asset.phonePrice ? formatKESCurrency(asset.phonePrice) : 'KES ',
+      safaricomPhoneNumber: asset.safaricomPhoneNumber ? formatKenyanPhone(asset.safaricomPhoneNumber) : '+254 ',
+      airtelPhoneNumber: asset.airtelPhoneNumber ? formatKenyanPhone(asset.airtelPhoneNumber) : '+254 ',
       phoneConditionComments: asset.phoneConditionComments,
     });
     setFormError('');
@@ -230,13 +277,21 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
       return;
     }
 
+    const cleanedPayload = {
+      ...formData,
+      laptopPrice: cleanKESForSaving(formData.laptopPrice),
+      phonePrice: cleanKESForSaving(formData.phonePrice),
+      safaricomPhoneNumber: cleanPhoneForSaving(formData.safaricomPhoneNumber),
+      airtelPhoneNumber: cleanPhoneForSaving(formData.airtelPhoneNumber),
+    };
+
     if (editingAsset && onUpdateAsset) {
       onUpdateAsset({
         ...editingAsset,
-        ...formData,
+        ...cleanedPayload,
       });
     } else if (onAddAsset) {
-      onAddAsset(formData);
+      onAddAsset(cleanedPayload);
     }
 
     setIsFormModalOpen(false);
@@ -533,7 +588,7 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                           S/N: {asset.laptopSerialNumber}
                         </span>
                         {asset.laptopPrice && (
-                          <span className="text-emerald-700 font-semibold">{asset.laptopPrice}</span>
+                          <span className="text-emerald-700 font-semibold">{formatKESCurrency(asset.laptopPrice)}</span>
                         )}
                       </div>
                       {asset.laptopConditionComments && (
@@ -599,7 +654,7 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                       </div>
                       {asset.phonePrice && (
                         <div className="text-[11px] text-emerald-700 font-semibold">
-                          Price: {asset.phonePrice}
+                          Price: {formatKESCurrency(asset.phonePrice)}
                         </div>
                       )}
                       {asset.phoneConditionComments && (
@@ -829,13 +884,21 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Department
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={formData.department}
                         onChange={e => setFormData({ ...formData, department: e.target.value })}
-                        placeholder="e.g. Engineering, Sales, IT Support"
                         className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500"
-                      />
+                      >
+                        <option value="">-- Select Department --</option>
+                        {formData.department && !ORGANIZATIONAL_DEPARTMENTS.includes(formData.department as any) && (
+                          <option value={formData.department}>{formData.department} (Current)</option>
+                        )}
+                        {ORGANIZATIONAL_DEPARTMENTS.map(dept => (
+                          <option key={dept} value={dept}>
+                            {dept}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -861,15 +924,21 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        3. Laptop Price
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>3. Laptop Price (KES)</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">KES</span>
                       </label>
                       <input
                         type="text"
                         value={formData.laptopPrice}
+                        onFocus={() => {
+                          if (!formData.laptopPrice || !formData.laptopPrice.trim()) {
+                            setFormData(prev => ({ ...prev, laptopPrice: 'KES ' }));
+                          }
+                        }}
                         onChange={e => setFormData({ ...formData, laptopPrice: e.target.value })}
-                        placeholder="e.g. KSh 295,000"
-                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500"
+                        placeholder="e.g. KES 185,000"
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500 font-medium"
                       />
                     </div>
                   </div>
@@ -1024,15 +1093,21 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        10. Phone Price
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>10. Phone Price (KES)</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">KES</span>
                       </label>
                       <input
                         type="text"
                         value={formData.phonePrice}
+                        onFocus={() => {
+                          if (!formData.phonePrice || !formData.phonePrice.trim()) {
+                            setFormData(prev => ({ ...prev, phonePrice: 'KES ' }));
+                          }
+                        }}
                         onChange={e => setFormData({ ...formData, phonePrice: e.target.value })}
-                        placeholder="e.g. KSh 165,000"
-                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500"
+                        placeholder="e.g. KES 45,000"
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500 font-medium"
                       />
                     </div>
                   </div>
@@ -1055,16 +1130,22 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                 <div className="space-y-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px]">5</span>
-                    Telecom SIM Lines (Fields 11 - 12)
+                    Telecom SIM Lines (Autofilled with +254 Country Code)
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        11. Safaricom Phone Number
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>11. Safaricom Phone Number</span>
+                        <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">+254 KE</span>
                       </label>
                       <input
                         type="text"
                         value={formData.safaricomPhoneNumber}
+                        onFocus={() => {
+                          if (!formData.safaricomPhoneNumber || !formData.safaricomPhoneNumber.trim()) {
+                            setFormData(prev => ({ ...prev, safaricomPhoneNumber: '+254 ' }));
+                          }
+                        }}
                         onChange={e => setFormData({ ...formData, safaricomPhoneNumber: e.target.value })}
                         placeholder="e.g. +254 712 345678"
                         className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500"
@@ -1072,12 +1153,18 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        12. Airtel Phone Number
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>12. Airtel Phone Number</span>
+                        <span className="text-[10px] text-rose-800 font-bold bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">+254 KE</span>
                       </label>
                       <input
                         type="text"
                         value={formData.airtelPhoneNumber}
+                        onFocus={() => {
+                          if (!formData.airtelPhoneNumber || !formData.airtelPhoneNumber.trim()) {
+                            setFormData(prev => ({ ...prev, airtelPhoneNumber: '+254 ' }));
+                          }
+                        }}
                         onChange={e => setFormData({ ...formData, airtelPhoneNumber: e.target.value })}
                         placeholder="e.g. +254 733 112233"
                         className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:border-blue-500"
@@ -1149,7 +1236,7 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Valuation / Price</span>
-                    <strong className="text-emerald-700">{viewingAsset.laptopPrice || '—'}</strong>
+                    <strong className="text-emerald-700">{viewingAsset.laptopPrice ? formatKESCurrency(viewingAsset.laptopPrice) : '—'}</strong>
                   </div>
                 </div>
                 {viewingAsset.laptopConditionComments && (
@@ -1201,7 +1288,7 @@ export const AssetDirectoryView: React.FC<AssetDirectoryViewProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Valuation / Price</span>
-                    <strong className="text-emerald-700">{viewingAsset.phonePrice || '—'}</strong>
+                    <strong className="text-emerald-700">{viewingAsset.phonePrice ? formatKESCurrency(viewingAsset.phonePrice) : '—'}</strong>
                   </div>
                 </div>
                 {viewingAsset.phoneConditionComments && (
