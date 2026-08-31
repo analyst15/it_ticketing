@@ -799,7 +799,7 @@ Elimisha Watoto Foundation IT Helpdesk`;
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`IT Support Desk server running on http://0.0.0.0:${PORT}`);
+    console.log(`IT Support Desk server running on http://localhost:${PORT}`);
   });
 }
 

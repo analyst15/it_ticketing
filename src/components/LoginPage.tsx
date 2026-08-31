@@ -89,7 +89,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
             <div className="border-l border-slate-700 pl-3.5">
               <div className="text-base sm:text-lg font-bold text-white leading-tight">Elimisha IT Desk</div>
-              <div className="text-xs text-slate-400 font-medium">Enterprise Support Portal</div>
+              <div className="text-xs text-slate-400 font-medium">IT Operations &amp; Service Desk</div>
             </div>
           </div>
         </div>
